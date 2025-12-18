@@ -14,7 +14,7 @@ All metrics and recommendations are advisory. Final deployment decisions require
 
 FairCareAI follows the methodology proposed in:
 
-> Van Calster B, et al. (2025). "Evaluating fairness of clinical prediction models: A practical guide." *The Lancet Digital Health*.
+> Van Calster B, Collins GS, Vickers AJ, et al. (2025). "Evaluation of performance measures in predictive artificial intelligence models to support medical decisions: overview and guidance." *The Lancet Digital Health*. https://doi.org/10.1016/j.landig.2025.100916
 
 This framework provides:
 
@@ -22,6 +22,52 @@ This framework provides:
 2. **Subgroup Analysis**: Stratified evaluation by demographic characteristics
 3. **Calibration Focus**: Emphasis on calibration for clinical decision-making
 4. **Uncertainty Quantification**: Bootstrap confidence intervals for all metrics
+
+### Van Calster 4: Recommended Core Metrics
+
+Per Van Calster et al. (2025) Table 2, FairCareAI implements the **4 RECOMMENDED** performance measures:
+
+| Metric | Van Calster Classification | Purpose |
+|--------|---------------------------|---------|
+| **AUROC** | "The key discrimination measure" | Measures model's ability to rank patients by risk |
+| **Calibration Plot** | "Most insightful approach to assess calibration" | Shows if predicted risks match observed outcomes |
+| **Net Benefit (DCA)** | "Essential to report for clinical utility" | Evaluates clinical decision-making value |
+| **Risk Distribution** | "Provides valuable insights" | Shows probability distributions by outcome |
+
+**Supporting OPTIONAL Metrics** (also implemented):
+- O:E ratio, Calibration slope/intercept, Brier score, Scaled Brier Score
+- ICI (Integrated Calibration Index), ECI (E-statistic Calibration Index)
+
+**Metrics Van Calster Warns Against** (NOT implemented):
+- F1 score: "ONLY metric violating BOTH properness AND clear focus"
+- Classification summaries (Accuracy, MCC, Kappa, DOR): Improper measures
+
+### Governance Dashboard Visualizations
+
+For governance audiences, these metrics are presented as simplified visualizations:
+
+#### Overall Performance (4 Figures)
+
+| Figure | What It Shows | Plain Language |
+|--------|---------------|----------------|
+| **AUROC Gauge** | Model discrimination ability | "How well does the model rank patients? 0.5 = coin flip, 1.0 = perfect" |
+| **Calibration Plot** | Predicted vs observed rates | "When the model says 20% risk, do 20% actually have the outcome?" |
+| **Brier Score Gauge** | Overall prediction accuracy | "How far off are the predictions? Lower is better (0 = perfect)" |
+| **Classification Metrics** | Sensitivity, specificity, PPV | "At this threshold, what happens to patients?" |
+
+#### Subgroup Fairness (4 Figures per Attribute)
+
+| Figure | What It Shows | Fairness Goal |
+|--------|---------------|---------------|
+| **AUROC by Group** | Discrimination by demographic | All bars similar height (difference <0.05) |
+| **Sensitivity by Group** | True positive rate by demographic | Equal opportunity (difference <10pp) |
+| **FPR by Group** | False positive rate by demographic | Equalized odds component |
+| **Selection Rate by Group** | % flagged high-risk by demographic | Demographic parity check |
+
+Each figure includes plain language explanations for non-technical audiences:
+
+> **Example (AUROC by Subgroup):**
+> "Does the model perform equally well across all demographic groups? All bars should be similar height. Lower bars mean the model is less accurate for that group. We want the model to work well for everyone."
 
 ---
 
@@ -313,10 +359,11 @@ thresholds = {
 
 ```bibtex
 @article{vancalster2025,
-  title={Evaluating fairness of clinical prediction models: A practical guide},
-  author={Van Calster, B and others},
+  title={Evaluation of performance measures in predictive artificial intelligence models to support medical decisions: overview and guidance},
+  author={Van Calster, Ben and Collins, Gary S and Vickers, Andrew J and others},
   journal={The Lancet Digital Health},
-  year={2025}
+  year={2025},
+  doi={10.1016/j.landig.2025.100916}
 }
 
 @article{collins2024tripod,

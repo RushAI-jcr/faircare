@@ -5,13 +5,34 @@ Publication-quality visualizations for model performance per TRIPOD+AI.
 Designed for governance committee presentations to lay stakeholders.
 
 Methodology: Van Calster et al. (2025), TRIPOD+AI (Collins et al. 2024).
+
+Van Calster et al. (2025) Metric Classification:
+- RECOMMENDED: AUROC, calibration_plot, net_benefit, decision_curve
+- OPTIONAL: Brier score, calibration slope/intercept, ICI, sensitivity, specificity, PPV, NPV
+- CAUTION: AUPRC, accuracy, F1, MCC (shown only with explicit request)
+
+Two-Persona Behavior:
+- Governance: RECOMMENDED metrics only (default)
+- Data Scientist: RECOMMENDED + OPTIONAL when include_optional=True
 """
+
+from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from faircareai.core.config import (
+    OutputPersona,
+    get_axis_labels,
+    get_label,
+)
+from faircareai.core.constants import (
+    VANCALSTER_ALL_CAUTION,
+    VANCALSTER_ALL_OPTIONAL,
+    VANCALSTER_ALL_RECOMMENDED,
+)
 from faircareai.visualization.themes import (
     FAIRCAREAI_COLORS,
     GOVERNANCE_DISCLAIMER_SHORT,
@@ -24,27 +45,67 @@ if TYPE_CHECKING:
     from faircareai.core.results import AuditResults
 
 
-def plot_discrimination_curves(results: "AuditResults") -> go.Figure:
-    """Plot ROC and Precision-Recall curves side by side.
+def _get_metric_category(metric: str) -> str:
+    """Get Van Calster category for a metric."""
+    metric_lower = metric.lower()
+    if metric_lower in VANCALSTER_ALL_RECOMMENDED:
+        return "RECOMMENDED"
+    if metric_lower in VANCALSTER_ALL_OPTIONAL:
+        return "OPTIONAL"
+    if metric_lower in VANCALSTER_ALL_CAUTION:
+        return "CAUTION"
+    return "UNKNOWN"
+
+
+def plot_discrimination_curves(
+    results: AuditResults,
+    include_optional: bool = False,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
+) -> go.Figure:
+    """Plot ROC curve (AUROC - RECOMMENDED) and optionally Precision-Recall curve.
+
+    Van Calster et al. (2025) Classification:
+    - AUROC: RECOMMENDED - always shown
+    - AUPRC: CAUTION - only shown when include_optional=True (mixes statistical/decision-analytical)
 
     TRIPOD+AI 2.1: Discrimination metrics visualization.
 
     Args:
         results: AuditResults from FairCareAudit.run().
+        include_optional: If True, shows PR curve with AUPRC (CAUTION metric).
+            If False, shows only ROC curve with AUROC (RECOMMENDED metric).
+            Default False for Governance persona.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
-        Plotly Figure with side-by-side curves.
+        Plotly Figure with discrimination curves.
+
+    Note:
+        AUPRC is classified as CAUTION by Van Calster et al. (2025) because it
+        "mixes statistical with decision-analytical" assessment. Use with caution.
     """
+    # Get persona-appropriate labels for AUROC
+    auroc_label = get_label("auroc", persona, "name")
+    x_label, y_label = get_axis_labels("auroc", persona)
     perf = results.overall_performance
     disc = perf.get("discrimination", {})
 
-    # Create subplots
-    fig = make_subplots(
-        rows=1,
-        cols=2,
-        subplot_titles=("ROC Curve", "Precision-Recall Curve"),
-        horizontal_spacing=0.12,
-    )
+    # Create subplots based on include_optional
+    if include_optional:
+        # Show both ROC (RECOMMENDED) and PR (CAUTION) curves
+        fig = make_subplots(
+            rows=1,
+            cols=2,
+            subplot_titles=(f"ROC Curve - {auroc_label} (RECOMMENDED)", "Precision-Recall Curve (CAUTION)"),
+            horizontal_spacing=0.12,
+        )
+    else:
+        # Show only ROC (RECOMMENDED) curve - single column
+        fig = make_subplots(
+            rows=1,
+            cols=1,
+            subplot_titles=(f"ROC Curve - {auroc_label}",),
+        )
 
     # === ROC Curve ===
     roc_data = disc.get("roc_curve", {})
@@ -82,77 +143,94 @@ def plot_discrimination_curves(results: "AuditResults") -> go.Figure:
             col=1,
         )
 
-    # Update ROC axes
+    # Update ROC axes with persona-appropriate labels
+    if persona == OutputPersona.GOVERNANCE:
+        x_axis_text = "False Alarm Rate (% without condition incorrectly flagged)"
+        y_axis_text = "Detection Rate (% with condition correctly identified)"
+    else:
+        x_axis_text = x_label or "False Positive Rate (% without outcome incorrectly flagged)"
+        y_axis_text = y_label or "True Positive Rate (% with outcome correctly identified)"
+
     fig.update_xaxes(
-        title_text="False Positive Rate (1 - Specificity)",
+        title_text=x_axis_text,
         range=[0, 1],
+        tickformat=".0%",
         row=1,
         col=1,
     )
     fig.update_yaxes(
-        title_text="True Positive Rate (Sensitivity)",
+        title_text=y_axis_text,
         range=[0, 1],
+        tickformat=".0%",
         row=1,
         col=1,
     )
 
-    # === Precision-Recall Curve ===
-    pr_data = disc.get("pr_curve", {})
-    recall = pr_data.get("recall", [])
-    precision = pr_data.get("precision", [])
+    # === Precision-Recall Curve (CAUTION metric - only if include_optional) ===
     auprc = disc.get("auprc", 0)
-    prevalence = disc.get("prevalence", 0)
+    if include_optional:
+        pr_data = disc.get("pr_curve", {})
+        recall = pr_data.get("recall", [])
+        precision = pr_data.get("precision", [])
+        prevalence = disc.get("prevalence", 0)
 
-    if recall and precision:
-        # PR curve
-        fig.add_trace(
-            go.Scatter(
-                x=recall,
-                y=precision,
-                mode="lines",
-                name=f"Model (AUPRC={auprc:.3f})",
-                line=dict(color=FAIRCAREAI_COLORS["secondary"], width=2.5),
-                hovertemplate="Recall: %{x:.3f}<br>Precision: %{y:.3f}<extra></extra>",
-            ),
+        if recall and precision:
+            # PR curve
+            fig.add_trace(
+                go.Scatter(
+                    x=recall,
+                    y=precision,
+                    mode="lines",
+                    name=f"Model (AUPRC={auprc:.3f})",
+                    line=dict(color=FAIRCAREAI_COLORS["secondary"], width=2.5),
+                    hovertemplate="Recall: %{x:.3f}<br>Precision: %{y:.3f}<extra></extra>",
+                ),
+                row=1,
+                col=2,
+            )
+
+            # Baseline (prevalence)
+            fig.add_trace(
+                go.Scatter(
+                    x=[0, 1],
+                    y=[prevalence, prevalence],
+                    mode="lines",
+                    name=f"Baseline (Prevalence={prevalence:.3f})",
+                    line=dict(color=FAIRCAREAI_COLORS["gray"], width=1.5, dash="dash"),
+                    showlegend=False,
+                ),
+                row=1,
+                col=2,
+            )
+
+        # Update PR axes with clear, descriptive labels
+        fig.update_xaxes(
+            title_text="Recall (% of actual positives detected)",
+            range=[0, 1],
+            tickformat=".0%",
             row=1,
             col=2,
         )
-
-        # Baseline (prevalence)
-        fig.add_trace(
-            go.Scatter(
-                x=[0, 1],
-                y=[prevalence, prevalence],
-                mode="lines",
-                name=f"Baseline (Prevalence={prevalence:.3f})",
-                line=dict(color=FAIRCAREAI_COLORS["gray"], width=1.5, dash="dash"),
-                showlegend=False,
-            ),
+        fig.update_yaxes(
+            title_text="Precision (% of flagged cases that are true positives)",
+            range=[0, 1],
+            tickformat=".0%",
             row=1,
             col=2,
         )
-
-    # Update PR axes
-    fig.update_xaxes(
-        title_text="Recall (Sensitivity)",
-        range=[0, 1],
-        row=1,
-        col=2,
-    )
-    fig.update_yaxes(
-        title_text="Precision (PPV)",
-        range=[0, 1],
-        row=1,
-        col=2,
-    )
 
     # Generate alt text for WCAG 2.1 AA compliance
-    auprc = disc.get("auprc", 0)
-    alt_text = (
-        f"Model discrimination curves. Left: ROC curve with AUROC = {auroc:.3f} {auroc_ci}. "
-        f"Right: Precision-Recall curve with AUPRC = {auprc:.3f}. "
-        "Higher values indicate better model discrimination."
-    )
+    if include_optional:
+        alt_text = (
+            f"Model discrimination curves. Left: ROC curve with AUROC = {auroc:.3f} {auroc_ci}. "
+            f"Right: Precision-Recall curve with AUPRC = {auprc:.3f} (CAUTION metric). "
+            "Higher values indicate better model discrimination."
+        )
+    else:
+        alt_text = (
+            f"Model discrimination: ROC curve with AUROC = {auroc:.3f} {auroc_ci}. "
+            "Higher AUROC indicates better discrimination between outcomes."
+        )
 
     # Apply theme and layout
     fig = apply_faircareai_theme(fig)
@@ -181,17 +259,36 @@ def plot_discrimination_curves(results: "AuditResults") -> go.Figure:
     return fig
 
 
-def plot_calibration_curve(results: "AuditResults") -> go.Figure:
+def plot_calibration_curve(
+    results: AuditResults,
+    include_optional: bool = False,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
+) -> go.Figure:
     """Plot calibration curve for overall model.
+
+    Van Calster et al. (2025) Classification:
+    - calibration_plot: RECOMMENDED - always shown
+    - Brier score, ICI, calibration slope: OPTIONAL - shown when include_optional=True
 
     TRIPOD+AI 2.2: Calibration visualization.
 
     Args:
         results: AuditResults from FairCareAudit.run().
+        include_optional: If True, shows OPTIONAL metrics (Brier, ICI, slope) in annotation.
+            If False, shows only the calibration curve (RECOMMENDED).
+            Default False for Governance persona.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
         Plotly Figure with calibration curve.
+
+    Note:
+        The calibration curve itself is RECOMMENDED per Van Calster et al. (2025).
+        Summary statistics (Brier, ICI, slope) are OPTIONAL as they can "conceal
+        the direction of miscalibration."
     """
+    # Get persona-appropriate labels
+    x_label, y_label = get_axis_labels("calibration", persona)
     perf = results.overall_performance
     cal = perf.get("calibration", {})
     cal_curve = cal.get("calibration_curve", {})
@@ -228,31 +325,32 @@ def plot_calibration_curve(results: "AuditResults") -> go.Figure:
             )
         )
 
-    # Metrics annotation
+    # Metrics annotation - OPTIONAL metrics shown only when include_optional=True
     slope = cal.get("calibration_slope", 1.0)
     brier = cal.get("brier_score", 0)
     ici = cal.get("ici", 0)
 
-    metrics_text = (
-        f"<b>Calibration Metrics</b><br>"
-        f"Slope: {slope:.2f} (ideal: 1.00)<br>"
-        f"Brier Score: {brier:.4f}<br>"
-        f"ICI: {ici:.4f}"
-    )
+    if include_optional:
+        metrics_text = (
+            f"<b>Calibration Metrics (OPTIONAL)</b><br>"
+            f"Slope: {slope:.2f} (ideal: 1.00)<br>"
+            f"Brier Score: {brier:.4f}<br>"
+            f"ICI: {ici:.4f}"
+        )
 
-    fig.add_annotation(
-        text=metrics_text,
-        xref="paper",
-        yref="paper",
-        x=0.02,
-        y=0.98,
-        showarrow=False,
-        font=dict(size=TYPOGRAPHY["annotation_size"]),
-        align="left",
-        bgcolor="rgba(255,255,255,0.8)",
-        bordercolor=FAIRCAREAI_COLORS["gray"],
-        borderwidth=1,
-    )
+        fig.add_annotation(
+            text=metrics_text,
+            xref="paper",
+            yref="paper",
+            x=0.02,
+            y=0.98,
+            showarrow=False,
+            font=dict(size=TYPOGRAPHY["annotation_size"]),
+            align="left",
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor=FAIRCAREAI_COLORS["gray"],
+            borderwidth=1,
+        )
 
     # Generate alt text for WCAG 2.1 AA compliance
     alt_text = (
@@ -261,16 +359,29 @@ def plot_calibration_curve(results: "AuditResults") -> go.Figure:
         "Points close to the diagonal indicate well-calibrated predictions."
     )
 
+    # Persona-appropriate title and axis labels
+    if persona == OutputPersona.GOVERNANCE:
+        title_text = "Prediction Accuracy: Do Predicted Risks Match Reality?"
+        x_axis_title = "Predicted Risk Level (what the model says)"
+        y_axis_title = "Actual Outcome Rate (what really happened)"
+    else:
+        title_text = "Model Calibration: Do Predicted Risks Match Reality?"
+        x_axis_title = x_label or "Mean Predicted Risk (what the model says)"
+        y_axis_title = y_label or "Observed Outcome Rate (what actually happened)"
+
     # Apply theme
     fig = apply_faircareai_theme(fig)
     fig.update_layout(
-        title=dict(text="Model Calibration", x=0.5),
-        xaxis_title="Mean Predicted Probability",
-        yaxis_title="Observed Outcome Rate",
+        title=dict(
+            text=title_text,
+            x=0.5
+        ),
+        xaxis_title=x_axis_title,
+        yaxis_title=y_axis_title,
         height=500,
         width=600,
-        xaxis=dict(range=[0, 1]),
-        yaxis=dict(range=[0, 1]),
+        xaxis=dict(range=[0, 1], tickformat=".0%"),
+        yaxis=dict(range=[0, 1], tickformat=".0%"),
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
 
@@ -289,20 +400,49 @@ def plot_calibration_curve(results: "AuditResults") -> go.Figure:
 
 
 def plot_threshold_analysis(
-    results: "AuditResults",
+    results: AuditResults,
     selected_threshold: float | None = None,
+    include_optional: bool = False,
 ) -> go.Figure:
     """Interactive threshold sensitivity analysis.
+
+    Van Calster et al. (2025) Classification:
+    - sensitivity, specificity, PPV, NPV: OPTIONAL - shown when include_optional=True
+    - This entire chart displays OPTIONAL classification metrics
 
     TRIPOD+AI 2.4: Threshold selection transparency.
 
     Args:
         results: AuditResults from FairCareAudit.run().
         selected_threshold: Threshold to highlight.
+        include_optional: If True, shows the threshold analysis chart.
+            If False, returns placeholder (chart contains only OPTIONAL metrics).
+            Default False for Governance persona.
 
     Returns:
         Plotly Figure with threshold analysis.
+
+    Note:
+        This chart displays OPTIONAL classification metrics per Van Calster et al. (2025).
+        For Governance reports, consider using the decision curve instead.
     """
+    if not include_optional:
+        # Governance mode: return placeholder
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Threshold analysis requires include_optional=True<br>"
+            "(Van Calster: sensitivity/specificity/PPV/NPV are OPTIONAL metrics)",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=TYPOGRAPHY["annotation_size"], color=FAIRCAREAI_COLORS["gray"]),
+        )
+        fig = apply_faircareai_theme(fig)
+        fig.update_layout(
+            title=dict(text="Threshold Selection Impact", x=0.5),
+            height=300,
+        )
+        return fig
     perf = results.overall_performance
     thresh_data = perf.get("threshold_analysis", {})
     plot_data = thresh_data.get("plot_data", {})
@@ -386,10 +526,23 @@ def plot_threshold_analysis(
                 col=1,
             )
 
-    # Update axes
-    fig.update_xaxes(title_text="Decision Threshold", row=2, col=1)
-    fig.update_yaxes(title_text="Metric Value", tickformat=".0%", row=1, col=1)
-    fig.update_yaxes(title_text="% Flagged", row=2, col=1)
+    # Update axes with descriptive labels
+    fig.update_xaxes(
+        title_text="Decision Threshold (risk cutoff for flagging patients)",
+        row=2,
+        col=1
+    )
+    fig.update_yaxes(
+        title_text="Performance Metric Value",
+        tickformat=".0%",
+        row=1,
+        col=1
+    )
+    fig.update_yaxes(
+        title_text="% of Patients Flagged as High-Risk",
+        row=2,
+        col=1
+    )
 
     # Generate alt text for WCAG 2.1 AA compliance
     threshold_text = f" Selected threshold: {selected_threshold:.2f}." if selected_threshold else ""
@@ -413,17 +566,31 @@ def plot_threshold_analysis(
     return fig
 
 
-def plot_decision_curve(results: "AuditResults") -> go.Figure:
+def plot_decision_curve(
+    results: AuditResults,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
+) -> go.Figure:
     """Plot Decision Curve Analysis for clinical utility.
+
+    Van Calster et al. (2025) Classification: RECOMMENDED
+    - net_benefit, decision_curve: Essential for clinical decision support
+    - Always shown regardless of include_optional setting
 
     TRIPOD+AI 2.5: Clinical utility assessment.
 
     Args:
         results: AuditResults from FairCareAudit.run().
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
         Plotly Figure with DCA curves.
+
+    Note:
+        This is a RECOMMENDED metric per Van Calster et al. (2025).
+        Decision curves show clinical utility across threshold probabilities.
     """
+    # Get persona-appropriate labels
+    x_label, y_label = get_axis_labels("decision_curve", persona)
     perf = results.overall_performance
     dca = perf.get("decision_curve", {})
 
@@ -490,17 +657,27 @@ def plot_decision_curve(results: "AuditResults") -> go.Figure:
         "Model is useful when its curve is above both 'Treat All' and 'Treat None' strategies."
     )
 
+    # Persona-appropriate title and axis labels
+    if persona == OutputPersona.GOVERNANCE:
+        title_text = "Clinical Utility Analysis: When is the Model Useful?"
+        x_axis_title = x_label or "Risk Cutoff Level (risk level for taking action)"
+        y_axis_title = y_label or "Clinical Value (benefit per 100 patients)"
+    else:
+        title_text = "Decision Curve Analysis: When is the Model Clinically Useful?"
+        x_axis_title = x_label or "Threshold Probability (risk level for action)"
+        y_axis_title = y_label or "Net Benefit (clinical value per 100 patients)"
+
     # Apply theme
     fig = apply_faircareai_theme(fig)
     fig.update_layout(
         title=dict(
-            text="Decision Curve Analysis: When is the Model Clinically Useful?",
+            text=title_text,
             x=0.5,
         ),
-        xaxis_title="Threshold Probability",
-        yaxis_title="Net Benefit",
+        xaxis_title=x_axis_title,
+        yaxis_title=y_axis_title,
         height=500,
-        xaxis=dict(range=[0, 1]),
+        xaxis=dict(range=[0, 1], tickformat=".0%"),
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
 
@@ -539,7 +716,7 @@ def plot_decision_curve(results: "AuditResults") -> go.Figure:
     return fig
 
 
-def plot_confusion_matrix(results: "AuditResults") -> go.Figure:
+def plot_confusion_matrix(results: AuditResults) -> go.Figure:
     """Plot confusion matrix heatmap.
 
     Args:
@@ -613,37 +790,61 @@ def plot_confusion_matrix(results: "AuditResults") -> go.Figure:
     return fig
 
 
-def plot_performance_summary(results: "AuditResults") -> go.Figure:
+def plot_performance_summary(
+    results: AuditResults,
+    include_optional: bool = False,
+) -> go.Figure:
     """Create a single-page performance summary for governance.
+
+    Van Calster et al. (2025) Classification:
+    - AUROC: RECOMMENDED - always shown
+    - Brier Score: OPTIONAL - shown when include_optional=True
+    - Sensitivity, Specificity, PPV, NPV: OPTIONAL - shown when include_optional=True
 
     Args:
         results: AuditResults from FairCareAudit.run().
+        include_optional: If True, shows full 2x2 summary with OPTIONAL metrics.
+            If False, shows RECOMMENDED metrics only (AUROC).
+            Default False for Governance persona.
 
     Returns:
         Plotly Figure with key performance metrics.
+
+    Note:
+        By default, shows only RECOMMENDED metrics per Van Calster et al. (2025).
+        Enable include_optional=True for full Data Scientist view.
     """
     perf = results.overall_performance
     disc = perf.get("discrimination", {})
     cal = perf.get("calibration", {})
     cls = perf.get("classification_at_threshold", {})
 
-    # Create 2x2 subplot
-    fig = make_subplots(
-        rows=2,
-        cols=2,
-        subplot_titles=(
-            "Discrimination (AUROC)",
-            "Calibration",
-            "Classification Metrics",
-            "Clinical Utility",
-        ),
-        specs=[
-            [{"type": "indicator"}, {"type": "indicator"}],
-            [{"type": "bar"}, {"type": "indicator"}],
-        ],
-        vertical_spacing=0.2,
-        horizontal_spacing=0.15,
-    )
+    if include_optional:
+        # Data Scientist view: full 2x2 subplot with OPTIONAL metrics
+        fig = make_subplots(
+            rows=2,
+            cols=2,
+            subplot_titles=(
+                "Discrimination (AUROC) - RECOMMENDED",
+                "Calibration (Brier) - OPTIONAL",
+                "Classification Metrics - OPTIONAL",
+                "% Flagged High Risk",
+            ),
+            specs=[
+                [{"type": "indicator"}, {"type": "indicator"}],
+                [{"type": "bar"}, {"type": "indicator"}],
+            ],
+            vertical_spacing=0.2,
+            horizontal_spacing=0.15,
+        )
+    else:
+        # Governance view: RECOMMENDED metrics only
+        fig = make_subplots(
+            rows=1,
+            cols=1,
+            subplot_titles=("Discrimination (AUROC) - RECOMMENDED",),
+            specs=[[{"type": "indicator"}]],
+        )
 
     # AUROC gauge
     auroc = disc.get("auroc", 0)
@@ -671,65 +872,67 @@ def plot_performance_summary(results: "AuditResults") -> go.Figure:
         col=1,
     )
 
-    # Calibration gauge (Brier score - lower is better)
-    brier = cal.get("brier_score", 0.25)
-    fig.add_trace(
-        go.Indicator(
-            mode="gauge+number",
-            value=brier,
-            number={"suffix": "", "valueformat": ".3f"},
-            title={"text": "Brier Score"},
-            gauge=dict(
-                axis=dict(range=[0, 0.5]),
-                bar=dict(color=FAIRCAREAI_COLORS["secondary"]),
-                steps=[
-                    {"range": [0, 0.1], "color": FAIRCAREAI_COLORS["success"]},
-                    {"range": [0.1, 0.2], "color": FAIRCAREAI_COLORS["warning"]},
-                    {"range": [0.2, 0.5], "color": FAIRCAREAI_COLORS["error"]},
-                ],
+    # OPTIONAL metrics - only shown when include_optional=True
+    if include_optional:
+        # Calibration gauge (Brier score - lower is better) - OPTIONAL
+        brier = cal.get("brier_score", 0.25)
+        fig.add_trace(
+            go.Indicator(
+                mode="gauge+number",
+                value=brier,
+                number={"suffix": "", "valueformat": ".3f"},
+                title={"text": "Brier Score"},
+                gauge=dict(
+                    axis=dict(range=[0, 0.5]),
+                    bar=dict(color=FAIRCAREAI_COLORS["secondary"]),
+                    steps=[
+                        {"range": [0, 0.1], "color": FAIRCAREAI_COLORS["success"]},
+                        {"range": [0.1, 0.2], "color": FAIRCAREAI_COLORS["warning"]},
+                        {"range": [0.2, 0.5], "color": FAIRCAREAI_COLORS["error"]},
+                    ],
+                ),
             ),
-        ),
-        row=1,
-        col=2,
-    )
+            row=1,
+            col=2,
+        )
 
-    # Classification metrics bar chart
-    metrics = {
-        "Sensitivity": cls.get("sensitivity", 0),
-        "Specificity": cls.get("specificity", 0),
-        "PPV": cls.get("ppv", 0),
-        "NPV": cls.get("npv", 0),
-    }
+        # Classification metrics bar chart - OPTIONAL
+        metrics = {
+            "Sensitivity": cls.get("sensitivity", 0),
+            "Specificity": cls.get("specificity", 0),
+            "PPV": cls.get("ppv", 0),
+            "NPV": cls.get("npv", 0),
+        }
 
-    fig.add_trace(
-        go.Bar(
-            x=list(metrics.keys()),
-            y=list(metrics.values()),
-            marker_color=[
-                FAIRCAREAI_COLORS["primary"],
-                FAIRCAREAI_COLORS["secondary"],
-                FAIRCAREAI_COLORS["accent"],
-                FAIRCAREAI_COLORS["success"],
-            ],
-            text=[f"{v:.1%}" for v in metrics.values()],
-            textposition="outside",
-        ),
-        row=2,
-        col=1,
-    )
+        fig.add_trace(
+            go.Bar(
+                x=list(metrics.keys()),
+                y=list(metrics.values()),
+                marker_color=[
+                    FAIRCAREAI_COLORS["primary"],
+                    FAIRCAREAI_COLORS["secondary"],
+                    FAIRCAREAI_COLORS["accent"],
+                    FAIRCAREAI_COLORS["success"],
+                ],
+                text=[f"{v:.1%}" for v in metrics.values()],
+                textposition="outside",
+            ),
+            row=2,
+            col=1,
+        )
 
-    # % Flagged indicator
-    pct_flagged = cls.get("pct_flagged", 0)
-    fig.add_trace(
-        go.Indicator(
-            mode="number+delta",
-            value=pct_flagged,
-            number={"suffix": "%", "valueformat": ".1f"},
-            title={"text": "% Flagged High Risk"},
-        ),
-        row=2,
-        col=2,
-    )
+        # % Flagged indicator
+        pct_flagged = cls.get("pct_flagged", 0)
+        fig.add_trace(
+            go.Indicator(
+                mode="number+delta",
+                value=pct_flagged,
+                number={"suffix": "%", "valueformat": ".1f"},
+                title={"text": "% Flagged High Risk"},
+            ),
+            row=2,
+            col=2,
+        )
 
     # Generate alt text for WCAG 2.1 AA compliance
     auroc = disc.get("auroc", 0)
@@ -739,26 +942,42 @@ def plot_performance_summary(results: "AuditResults") -> go.Figure:
     ppv = cls.get("ppv", 0)
     npv = cls.get("npv", 0)
     pct_flagged = cls.get("pct_flagged", 0)
-    alt_text = (
-        f"Model performance summary for {results.config.model_name}. "
-        f"AUROC: {auroc:.3f}. Brier Score: {brier:.4f}. "
-        f"Sensitivity: {sensitivity:.1%}, Specificity: {specificity:.1%}, "
-        f"PPV: {ppv:.1%}, NPV: {npv:.1%}. "
-        f"{pct_flagged:.1f}% of patients flagged as high risk."
-    )
 
-    # Update layout
-    fig.update_layout(
-        title=dict(
-            text=f"Model Performance Summary - {results.config.model_name}",
-            x=0.5,
-        ),
-        height=600,
-        showlegend=False,
-        meta={"description": alt_text},  # WCAG 2.1 screen reader support
-    )
-    fig.update_yaxes(title_text="Value", range=[0, 1.1], tickformat=".0%", row=2, col=1)
-    fig.update_xaxes(title_text="Metric", row=2, col=1)
+    if include_optional:
+        alt_text = (
+            f"Model performance summary for {results.config.model_name}. "
+            f"AUROC: {auroc:.3f} (RECOMMENDED). Brier Score: {brier:.4f} (OPTIONAL). "
+            f"Sensitivity: {sensitivity:.1%}, Specificity: {specificity:.1%}, "
+            f"PPV: {ppv:.1%}, NPV: {npv:.1%} (all OPTIONAL). "
+            f"{pct_flagged:.1f}% of patients flagged as high risk."
+        )
+        # Update layout for 2x2 grid
+        fig.update_layout(
+            title=dict(
+                text=f"Model Performance Summary - {results.config.model_name}",
+                x=0.5,
+            ),
+            height=600,
+            showlegend=False,
+            meta={"description": alt_text},
+        )
+        fig.update_yaxes(title_text="Value", range=[0, 1.1], tickformat=".0%", row=2, col=1)
+        fig.update_xaxes(title_text="Metric", row=2, col=1)
+    else:
+        alt_text = (
+            f"Model discrimination summary for {results.config.model_name}. "
+            f"AUROC: {auroc:.3f} (RECOMMENDED metric per Van Calster et al. 2025)."
+        )
+        # Update layout for single gauge
+        fig.update_layout(
+            title=dict(
+                text=f"Model Discrimination (AUROC) - {results.config.model_name}",
+                x=0.5,
+            ),
+            height=350,
+            showlegend=False,
+            meta={"description": alt_text},
+        )
 
     # Apply theme
     fig = apply_faircareai_theme(fig)

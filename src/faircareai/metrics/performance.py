@@ -5,6 +5,29 @@ Compute overall model performance metrics per TRIPOD+AI standards.
 Includes discrimination, calibration, and clinical utility metrics.
 
 Methodology: Van Calster et al. (2025), TRIPOD+AI (Collins et al. 2024).
+
+Van Calster et al. (2025) Metric Classification:
+-------------------------------------------------
+RECOMMENDED (essential for governance reports):
+  - AUROC: Key discrimination measure
+  - Calibration plot: Smoothed calibration curve
+  - Net Benefit: Clinical utility via decision curve analysis
+  - Risk Distribution: Probability distributions by outcome
+
+OPTIONAL (acceptable for data science teams):
+  - Brier score, Scaled Brier Score (BSS)
+  - O:E ratio, Calibration slope, Calibration intercept
+  - ICI, ECI (Integrated/E-statistic Calibration Index)
+  - Sensitivity + Specificity (together), PPV + NPV (together)
+
+USE_WITH_CAUTION (improper measures - use with explicit caveats only):
+  - F1 score: ONLY metric violating BOTH properness AND clear focus
+  - Accuracy, Balanced Accuracy, Youden Index
+  - MCC (Matthews Correlation Coefficient)
+  - DOR (Diagnostic Odds Ratio), Kappa
+  - AUPRC, partial AUROC (mix statistical with decision-analytical)
+
+See constants.py for VANCALSTER_* classification constants.
 """
 
 from typing import Any
@@ -12,7 +35,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 from sklearn.calibration import calibration_curve
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
@@ -22,6 +45,7 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
+from statsmodels.api import Logit
 
 from faircareai.core.constants import (
     BRIER_POOR_THRESHOLD,
@@ -197,27 +221,44 @@ def compute_calibration_metrics(
     # Brier score
     brier = brier_score_loss(y_true, y_prob)
 
+    # Scaled Brier Score (BSS) per Van Calster et al.
+    # BSS = 1 - (Brier / Brier_null), where Brier_null = prevalence * (1 - prevalence)
+    prevalence = np.mean(y_true)
+    brier_null = prevalence * (1 - prevalence)
+    brier_scaled = 1 - (brier / brier_null) if brier_null > 0 else 0.0
+
     # Calibration curve
     try:
         prob_true, prob_pred = calibration_curve(y_true, y_prob, n_bins=n_bins, strategy="uniform")
     except ValueError:
         prob_true, prob_pred = np.array([]), np.array([])
 
-    # Calibration slope and intercept via linear regression
-    # Regress y_true on logit(y_prob) per Van Calster et al. 2016
+    # Calibration intercept and slope per Van Calster et al. methodology
+    # Intercept: fit logistic model with logit(p) as OFFSET (coefficient fixed at 1)
+    # Slope: fit logistic regression with logit(p) as predictor
+    # Slope = 1 means perfect calibration, <1 = overfitting, >1 = underfitting
     slope = 1.0
     intercept = 0.0
     try:
         # Clip probabilities to avoid log(0)
         y_prob_clipped = np.clip(y_prob, PROB_CLIP_MIN, PROB_CLIP_MAX)
-        log_odds = np.log(y_prob_clipped / (1 - y_prob_clipped)).reshape(-1, 1)
+        logit_p = np.log(y_prob_clipped / (1 - y_prob_clipped))
 
-        # Use linear regression (NOT logistic) for calibration slope
-        # Slope = 1 means perfect calibration, <1 = overfitting, >1 = underfitting
-        lr = LinearRegression()
-        lr.fit(log_odds, y_true)
-        slope = float(lr.coef_[0])
-        intercept = float(lr.intercept_)
+        # Calibration INTERCEPT using statsmodels Logit with offset
+        # This is the Van Calster method: logit(Y) = α + offset(logit_p)
+        try:
+            int_model = Logit(y_true, np.ones_like(y_true), offset=logit_p).fit(disp=0)
+            intercept = float(int_model.params.iloc[0])
+        except Exception:
+            # Fallback to sklearn method if statsmodels fails
+            lr_int = LogisticRegression(solver="lbfgs", max_iter=1000)
+            lr_int.fit(logit_p.reshape(-1, 1), y_true)
+            intercept = float(lr_int.intercept_[0])
+
+        # Calibration SLOPE using sklearn LogisticRegression
+        lr_slope = LogisticRegression(solver="lbfgs", max_iter=1000)
+        lr_slope.fit(logit_p.reshape(-1, 1), y_true)
+        slope = float(lr_slope.coef_[0, 0])
     except (ValueError, np.linalg.LinAlgError) as e:
         logger.warning(
             "Calibration slope computation failed: %s. Using default slope=1.0",
@@ -229,11 +270,19 @@ def compute_calibration_metrics(
     observed = np.sum(y_true)
     eo_ratio = expected / observed if observed > 0 else float("inf")
 
-    # ICI (Integrated Calibration Index)
-    # Average absolute difference between predicted and smoothed observed
+    # ICI (Integrated Calibration Index) - average absolute calibration error
+    # Per Van Calster: mean(|smoothed_observed - predicted|)
     ici = 0.0
     if len(prob_true) > 0:
         ici = float(np.mean(np.abs(prob_pred - prob_true)))
+
+    # ECI (E-statistic Calibration Index) - squared calibration error normalized
+    # Per Van Calster: mean((smoothed_observed - predicted)^2) / mean((prevalence - predicted)^2)
+    eci = 0.0
+    if len(prob_true) > 0:
+        eci_numer = np.mean((prob_true - prob_pred) ** 2)
+        eci_denom = np.mean((prevalence - prob_pred) ** 2)
+        eci = float(eci_numer / eci_denom) if eci_denom > 0 else 0.0
 
     # E_max (maximum calibration error)
     e_max = 0.0
@@ -242,10 +291,12 @@ def compute_calibration_metrics(
 
     return {
         "brier_score": float(brier),
+        "brier_scaled": float(brier_scaled),  # Van Calster BSS
         "calibration_slope": slope,
         "calibration_intercept": intercept,
         "eo_ratio": float(eo_ratio),
         "ici": ici,
+        "eci": eci,  # Van Calster E-statistic
         "e_max": e_max,
         "calibration_curve": {
             "prob_true": prob_true.tolist() if len(prob_true) > 0 else [],
@@ -290,19 +341,46 @@ def compute_classification_at_threshold(
         n_bootstrap: Number of bootstrap iterations.
 
     Returns:
-        Dict with sensitivity, specificity, PPV, NPV, F1, NNE.
+        Dict with sensitivity, specificity, PPV, NPV, F1, accuracy,
+        balanced_accuracy, youden_index, mcc (Matthews), NNE.
     """
     y_pred = (y_prob >= threshold).astype(int)
 
     # Confusion matrix
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
 
-    # Metrics
+    # Core metrics
     sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
     ppv = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     npv = tn / (tn + fn) if (tn + fn) > 0 else 0.0
     f1 = f1_score(y_true, y_pred, zero_division=0)
+
+    # Additional Van Calster classification metrics
+    n_total = tp + tn + fp + fn
+    accuracy = (tp + tn) / n_total if n_total > 0 else 0.0
+    balanced_accuracy = (sensitivity + specificity) / 2
+    youden_index = sensitivity + specificity - 1
+
+    # Matthews Correlation Coefficient (MCC)
+    # MCC = (TP*TN - FP*FN) / sqrt((TP+FP)(TP+FN)(TN+FP)(TN+FN))
+    mcc_denom = np.sqrt(
+        float((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+    )
+    mcc = (tp * tn - fp * fn) / mcc_denom if mcc_denom > 0 else 0.0
+
+    # DOR (Diagnostic Odds Ratio) per Van Calster
+    # DOR = (Sens / (1 - Spec)) / ((1 - Sens) / Spec)
+    if specificity > 0 and specificity < 1 and sensitivity > 0 and sensitivity < 1:
+        dor = (sensitivity / (1 - specificity)) / ((1 - sensitivity) / specificity)
+    else:
+        dor = float("inf") if sensitivity == 1 and specificity == 1 else 0.0
+
+    # Kappa (Cohen's Kappa) per Van Calster
+    # Kappa = (Accuracy - Accuracy_expected) / (1 - Accuracy_expected)
+    prevalence = np.mean(y_true)
+    acc_expected = prevalence * ((tp + fp) / n_total) + (1 - prevalence) * ((fn + tn) / n_total) if n_total > 0 else 0
+    kappa = (accuracy - acc_expected) / (1 - acc_expected) if acc_expected < 1 else 0.0
 
     # Percentage flagged
     pct_flagged = (tp + fp) / len(y_true) * 100 if len(y_true) > 0 else 0.0
@@ -317,6 +395,13 @@ def compute_classification_at_threshold(
         "ppv": float(ppv),
         "npv": float(npv),
         "f1_score": float(f1),
+        # Van Calster additional classification metrics
+        "accuracy": float(accuracy),
+        "balanced_accuracy": float(balanced_accuracy),
+        "youden_index": float(youden_index),
+        "mcc": float(mcc),
+        "dor": float(dor) if dor != float("inf") else None,  # Van Calster DOR
+        "kappa": float(kappa),  # Van Calster Kappa
         "pct_flagged": float(pct_flagged),
         "nne": float(nne) if nne != float("inf") else None,
         "tp": int(tp),
@@ -401,6 +486,10 @@ def compute_threshold_analysis(
         "ppv": [m["ppv"] for m in results["metrics"]],
         "npv": [m["npv"] for m in results["metrics"]],
         "f1": [m["f1_score"] for m in results["metrics"]],
+        "accuracy": [m["accuracy"] for m in results["metrics"]],
+        "balanced_accuracy": [m["balanced_accuracy"] for m in results["metrics"]],
+        "youden_index": [m["youden_index"] for m in results["metrics"]],
+        "mcc": [m["mcc"] for m in results["metrics"]],
         "pct_flagged": [m["pct_flagged"] for m in results["metrics"]],
     }
 

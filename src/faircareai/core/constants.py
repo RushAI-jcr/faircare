@@ -162,3 +162,137 @@ PROB_CLIP_MIN: Final[float] = 1e-7
 
 PROB_CLIP_MAX: Final[float] = 1 - 1e-7
 """Maximum probability for log calculations (avoid log(1))."""
+
+
+# =============================================================================
+# VAN CALSTER METRIC CLASSIFICATION (2025)
+# =============================================================================
+# Based on Van Calster et al. (2025) Lancet Digital Health Table 2
+# https://doi.org/10.1016/j.landig.2025.100916
+#
+# Classification:
+# - RECOMMENDED: Essential for all reports (Table 2 "Recommended")
+# - OPTIONAL: Acceptable but not essential (Table 2 "Not Essential")
+# - USE_WITH_CAUTION: Improper measures (Table 2 "Inadvisable")
+
+# Discrimination metrics
+VANCALSTER_RECOMMENDED_DISCRIMINATION: Final[tuple[str, ...]] = (
+    "auroc",
+)
+"""Van Calster RECOMMENDED: AUROC is the key discrimination measure."""
+
+VANCALSTER_OPTIONAL_DISCRIMINATION: Final[tuple[str, ...]] = (
+    "discrimination_slope",  # Improper but sometimes useful for internal validation
+)
+"""Van Calster OPTIONAL: Acceptable for data science teams."""
+
+VANCALSTER_CAUTION_DISCRIMINATION: Final[tuple[str, ...]] = (
+    "auprc",  # Mixes statistical with decision-analytical
+    "partial_auroc",  # Mixes statistical with decision-analytical
+)
+"""Van Calster INADVISABLE: Use with explicit caveats only."""
+
+# Calibration metrics
+VANCALSTER_RECOMMENDED_CALIBRATION: Final[tuple[str, ...]] = (
+    "calibration_plot",  # Smoothed (loess) calibration plot
+)
+"""Van Calster RECOMMENDED: Calibration plot is essential."""
+
+VANCALSTER_OPTIONAL_CALIBRATION: Final[tuple[str, ...]] = (
+    "oe_ratio",  # Interpretable but partial
+    "calibration_intercept",  # Hard to interpret
+    "calibration_slope",  # Hard to interpret
+    "ici",  # Summarizes plot but conceals direction
+    "eci",  # Summarizes plot but conceals direction
+    "ece",  # Summarizes plot but conceals direction
+    "brier_score",  # Strictly proper, useful
+    "brier_scaled",  # Strictly proper, useful
+)
+"""Van Calster OPTIONAL: Acceptable for data science teams."""
+
+# Clinical utility metrics
+VANCALSTER_RECOMMENDED_CLINICAL_UTILITY: Final[tuple[str, ...]] = (
+    "net_benefit",
+    "standardized_net_benefit",
+    "decision_curve",
+)
+"""Van Calster RECOMMENDED: Essential for clinical decision support."""
+
+VANCALSTER_OPTIONAL_CLINICAL_UTILITY: Final[tuple[str, ...]] = (
+    "expected_cost",
+)
+"""Van Calster OPTIONAL: Alternative to net benefit."""
+
+# Overall performance metrics
+VANCALSTER_RECOMMENDED_OVERALL: Final[tuple[str, ...]] = (
+    "risk_distribution_plot",  # Shows probability distributions by outcome
+)
+"""Van Calster RECOMMENDED: Distribution plots provide valuable insights."""
+
+VANCALSTER_OPTIONAL_OVERALL: Final[tuple[str, ...]] = (
+    "loglikelihood",
+    "logloss",
+    "mcfadden_r2",
+    "cox_snell_r2",
+    "nagelkerke_r2",
+)
+"""Van Calster OPTIONAL: Useful for model selection."""
+
+VANCALSTER_CAUTION_OVERALL: Final[tuple[str, ...]] = (
+    "mape",  # Improper
+)
+"""Van Calster INADVISABLE: Mean absolute prediction error is improper."""
+
+# Classification metrics
+VANCALSTER_OPTIONAL_CLASSIFICATION: Final[tuple[str, ...]] = (
+    "sensitivity",  # Can be descriptive if reported with specificity
+    "specificity",  # Can be descriptive if reported with sensitivity
+    "ppv",  # Can be descriptive if reported with NPV
+    "npv",  # Can be descriptive if reported with PPV
+)
+"""Van Calster OPTIONAL: Acceptable if reported in pairs (Sens+Spec, PPV+NPV)."""
+
+VANCALSTER_CAUTION_CLASSIFICATION: Final[tuple[str, ...]] = (
+    "accuracy",  # Improper at clinically relevant thresholds
+    "balanced_accuracy",  # Improper at clinically relevant thresholds
+    "youden_index",  # Improper at clinically relevant thresholds
+    "f1_score",  # ONLY measure violating BOTH properness AND clear focus
+    "mcc",  # Improper, hard to interpret
+    "dor",  # Improper
+    "kappa",  # Improper
+)
+"""Van Calster INADVISABLE: Classification summary measures are improper.
+
+These metrics can mislead - use ONLY for data science exploration with explicit
+caveats. Never use for clinical decision making or governance reports.
+
+Van Calster et al. (2025): "We warn against the use of measures that are improper
+(13 measures) or that do not have a clear focus on either statistical or
+decision-analytical performance (three measures). Remarkably, F1 is the only
+measure violating both characteristics."
+"""
+
+# Combined sets for easy filtering
+VANCALSTER_ALL_RECOMMENDED: Final[tuple[str, ...]] = (
+    *VANCALSTER_RECOMMENDED_DISCRIMINATION,
+    *VANCALSTER_RECOMMENDED_CALIBRATION,
+    *VANCALSTER_RECOMMENDED_CLINICAL_UTILITY,
+    *VANCALSTER_RECOMMENDED_OVERALL,
+)
+"""All Van Calster RECOMMENDED metrics - use for governance reports."""
+
+VANCALSTER_ALL_OPTIONAL: Final[tuple[str, ...]] = (
+    *VANCALSTER_OPTIONAL_DISCRIMINATION,
+    *VANCALSTER_OPTIONAL_CALIBRATION,
+    *VANCALSTER_OPTIONAL_CLINICAL_UTILITY,
+    *VANCALSTER_OPTIONAL_OVERALL,
+    *VANCALSTER_OPTIONAL_CLASSIFICATION,
+)
+"""All Van Calster OPTIONAL metrics - acceptable for data science."""
+
+VANCALSTER_ALL_CAUTION: Final[tuple[str, ...]] = (
+    *VANCALSTER_CAUTION_DISCRIMINATION,
+    *VANCALSTER_CAUTION_OVERALL,
+    *VANCALSTER_CAUTION_CLASSIFICATION,
+)
+"""All Van Calster INADVISABLE metrics - use with explicit caveats only."""

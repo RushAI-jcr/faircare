@@ -3,10 +3,19 @@ FairCareAI Van Calster Visualization Components
 
 Implements the four recommended visualizations from Van Calster et al. (2025):
 
-1. AUROC Forest Plot by Subgroup
-2. Calibration Plots by Subgroup (smoothed)
-3. Decision Curves (Net Benefit) by Subgroup
-4. Risk Distribution Plots by Subgroup (violin/box plots)
+1. AUROC Forest Plot by Subgroup (RECOMMENDED)
+2. Calibration Plots by Subgroup (RECOMMENDED - smoothed)
+3. Decision Curves (Net Benefit) by Subgroup (RECOMMENDED)
+4. Risk Distribution Plots by Subgroup (RECOMMENDED - violin/box)
+
+All four visualizations are RECOMMENDED per Van Calster Table 2 and are always
+shown regardless of include_optional setting. However, supplementary annotations
+(O:E ratio, Brier score, ICI) are OPTIONAL and require include_optional=True.
+
+Two-Persona Behavior:
+- Governance: Shows all four plots without OPTIONAL metric annotations
+- Data Scientist: Shows all four plots WITH OPTIONAL metric annotations when
+  include_optional=True is passed
 
 Reference:
     Van Calster B, Collins GS, Vickers AJ, et al. Evaluation of performance
@@ -20,11 +29,19 @@ WCAG 2.1 AA Compliance:
 - Sufficient contrast ratios for text and data elements
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+from faircareai.core.config import (
+    OutputPersona,
+    get_axis_labels,
+    get_label,
+)
 
 from .themes import (
     FAIRCAREAI_BRAND,
@@ -206,30 +223,44 @@ def _add_source_annotation(
 
 def create_auroc_forest_plot(
     results: dict[str, Any],
-    title: str = "AUROC by Demographic Subgroup",
+    title: str | None = None,
     subtitle: str | None = None,
     show_reference_line: bool = True,
     reference_auroc: float | None = None,
     enable_ghosting: bool = True,
     source_note: str | None = None,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
     """Create forest plot of AUROC values across subgroups.
+
+    Van Calster et al. (2025) Classification: RECOMMENDED
+    - AUROC is the key discrimination measure
+    - Always shown regardless of include_optional setting
 
     Per Van Calster et al. (2025): "AUROC is the key measure for
     comparing discrimination across demographic groups."
 
     Args:
         results: Dict with 'groups' containing per-subgroup AUROC data.
-        title: Chart title.
+        title: Chart title. Uses persona-appropriate default if None.
         subtitle: Optional subtitle.
         show_reference_line: Show line at reference/overall AUROC.
         reference_auroc: Value for reference line (uses overall if not provided).
         enable_ghosting: Reduce opacity for small samples.
         source_note: Custom source note.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
         Plotly Figure with forest plot.
+
+    Note:
+        This is a RECOMMENDED metric per Van Calster et al. (2025).
+        The forest plot format allows easy comparison across demographic groups.
     """
+    # Get persona-appropriate title
+    metric_label = get_label("auroc", persona, "name")
+    if title is None:
+        title = f"{metric_label} by Demographic Subgroup"
     groups = results.get("groups", {})
 
     if not groups:
@@ -359,6 +390,14 @@ def create_auroc_forest_plot(
     # Generate alt text
     alt_text = _generate_auroc_forest_alt_text(results, title)
 
+    # Persona-appropriate axis labels
+    if persona == OutputPersona.GOVERNANCE:
+        x_axis_text = "Model Discrimination (0.5=random, 1.0=perfect)"
+        y_axis_text = "Patient Group"
+    else:
+        x_axis_text = "AUROC (Discrimination Accuracy: 0.5=random, 1.0=perfect)"
+        y_axis_text = "Demographic Subgroup"
+
     fig.update_layout(
         title=dict(
             text=(
@@ -372,14 +411,20 @@ def create_auroc_forest_plot(
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["heading_size"]),
         ),
         xaxis=dict(
-            title=dict(text="AUROC (C-statistic)", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=x_axis_text,
+                font=dict(size=TYPOGRAPHY["axis_title_size"])
+            ),
             range=[0.4, 1.0],
             showgrid=True,
             gridcolor=SEMANTIC_COLORS["grid"],
             gridwidth=1,
         ),
         yaxis=dict(
-            title=dict(text="Subgroup", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=y_axis_text,
+                font=dict(size=TYPOGRAPHY["axis_title_size"])
+            ),
             showgrid=False,
             categoryorder="array",
             categoryarray=y_labels,
@@ -401,24 +446,42 @@ def create_auroc_forest_plot(
 
 def create_calibration_plot_by_subgroup(
     results: dict[str, Any],
-    title: str = "Calibration by Demographic Subgroup",
+    title: str | None = None,
     show_confidence_region: bool = True,
     source_note: str | None = None,
+    include_optional: bool = False,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
     """Create calibration curves for each subgroup.
+
+    Van Calster et al. (2025) Classification:
+    - calibration_plot: RECOMMENDED - always shown
+    - O:E ratio, Brier score in hover: OPTIONAL - shown when include_optional=True
 
     Per Van Calster et al. (2025): "Calibration plot is the most insightful
     approach to assess calibration, particularly when smoothing is used."
 
     Args:
         results: Dict with 'groups' containing calibration curve data.
-        title: Chart title.
+        title: Chart title. Uses persona-appropriate default if None.
         show_confidence_region: Show shaded CI region around curves.
         source_note: Custom source note.
+        include_optional: If True, shows OPTIONAL metrics (O:E ratio, Brier) in hover.
+            If False, shows basic hover info only. Default False for Governance.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
         Plotly Figure with calibration curves.
+
+    Note:
+        The calibration plot itself is RECOMMENDED and always shown.
+        O:E ratio and Brier score are OPTIONAL supplementary metrics.
     """
+    # Get persona-appropriate labels
+    metric_label = get_label("calibration", persona, "name")
+    x_label, y_label = get_axis_labels("calibration", persona)
+    if title is None:
+        title = f"{metric_label} by Demographic Subgroup"
     groups = results.get("groups", {})
 
     if not groups:
@@ -462,7 +525,22 @@ def create_calibration_plot_by_subgroup(
         oe = group_data.get("oe_ratio", 1.0)
         brier = group_data.get("brier_score", 0)
 
-        # Calibration curve
+        # Calibration curve - OPTIONAL metrics in hover only when include_optional=True
+        if include_optional:
+            hover_template = (
+                f"<b>{group_name}</b><br>"
+                "Predicted: %{x:.1%}<br>"
+                "Observed: %{y:.1%}<br>"
+                f"O:E Ratio: {oe:.2f} (OPTIONAL)<br>"
+                f"Brier: {brier:.3f} (OPTIONAL)<extra></extra>"
+            )
+        else:
+            hover_template = (
+                f"<b>{group_name}</b><br>"
+                "Predicted: %{x:.1%}<br>"
+                "Observed: %{y:.1%}<extra></extra>"
+            )
+
         fig.add_trace(
             go.Scatter(
                 x=prob_pred,
@@ -471,37 +549,45 @@ def create_calibration_plot_by_subgroup(
                 line=dict(color=color, width=2),
                 marker=dict(size=8, color=color),
                 name=f"{group_name} (n={n:,})",
-                hovertemplate=(
-                    f"<b>{group_name}</b><br>"
-                    "Predicted: %{x:.1%}<br>"
-                    "Observed: %{y:.1%}<br>"
-                    f"O:E Ratio: {oe:.2f}<br>"
-                    f"Brier: {brier:.3f}<extra></extra>"
-                ),
+                hovertemplate=hover_template,
             )
         )
 
     # Generate alt text
     alt_text = _generate_calibration_alt_text(results, title)
 
+    # Persona-appropriate subtitle and axis labels
+    if persona == OutputPersona.GOVERNANCE:
+        subtitle_text = "Points near diagonal = trustworthy risk predictions"
+        x_axis_text = x_label or "Predicted Risk Level (what the model predicts)"
+        y_axis_text = y_label or "Actual Outcome Rate (what really happened)"
+    else:
+        subtitle_text = "Points near diagonal = trustworthy risk predictions"
+        x_axis_text = x_label or "Mean Predicted Risk (what the model says will happen)"
+        y_axis_text = y_label or "Observed Outcome Rate (what actually happened)"
+
     fig.update_layout(
         title=dict(
             text=(
                 f"<b>{title}</b><br>"
                 f"<span style='font-size:{TYPOGRAPHY['body_size']}px;color:#666'>"
-                "Closer to diagonal = better calibrated</span>"
+                f"{subtitle_text}</span>"
             ),
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["subheading_size"]),
         ),
         xaxis=dict(
             title=dict(
-                text="Mean Predicted Probability", font=dict(size=TYPOGRAPHY["axis_title_size"])
+                text=x_axis_text,
+                font=dict(size=TYPOGRAPHY["axis_title_size"])
             ),
             tickformat=".0%",
             range=[0, 1],
         ),
         yaxis=dict(
-            title=dict(text="Observed Proportion", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=y_axis_text,
+                font=dict(size=TYPOGRAPHY["axis_title_size"])
+            ),
             tickformat=".0%",
             range=[0, 1],
         ),
@@ -523,12 +609,17 @@ def create_calibration_plot_by_subgroup(
 
 def create_decision_curve_by_subgroup(
     results: dict[str, Any],
-    title: str = "Decision Curves by Demographic Subgroup",
+    title: str | None = None,
     threshold_range: tuple[float, float] = (0.05, 0.5),
     show_reference_strategies: bool = True,
     source_note: str | None = None,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
     """Create decision curves showing net benefit by subgroup.
+
+    Van Calster et al. (2025) Classification: RECOMMENDED
+    - Net benefit and decision curves are essential for clinical decision support
+    - Always shown regardless of include_optional setting
 
     Per Van Calster et al. (2025): "Net benefit with decision curve analysis
     is essential to report. It evaluates whether a model leads to improved
@@ -536,14 +627,25 @@ def create_decision_curve_by_subgroup(
 
     Args:
         results: Dict with 'groups' containing decision curve data.
-        title: Chart title.
+        title: Chart title. Uses persona-appropriate default if None.
         threshold_range: Range of thresholds to display (min, max).
         show_reference_strategies: Show 'treat all' and 'treat none' lines.
         source_note: Custom source note.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
         Plotly Figure with decision curves.
+
+    Note:
+        This is a RECOMMENDED metric per Van Calster et al. (2025).
+        Decision curves show when using the model leads to better decisions
+        than treating all or no patients.
     """
+    # Get persona-appropriate labels
+    metric_label = get_label("decision_curve", persona, "name")
+    x_label, y_label = get_axis_labels("decision_curve", persona)
+    if title is None:
+        title = f"{metric_label} by Demographic Subgroup"
     groups = results.get("groups", {})
     threshold = results.get("primary_threshold", 0.5)
 
@@ -645,22 +747,38 @@ def create_decision_curve_by_subgroup(
     # Generate alt text
     alt_text = _generate_decision_curve_alt_text(results, title, threshold)
 
+    # Persona-appropriate subtitle and axis labels
+    if persona == OutputPersona.GOVERNANCE:
+        subtitle_text = "Model is useful when curve is above both baseline strategies"
+        x_axis_text = x_label or "Risk Cutoff Level (risk level that triggers action)"
+        y_axis_text = y_label or "Clinical Value (benefit per 100 patients)"
+    else:
+        subtitle_text = "Model adds value when curve is above both baseline strategies"
+        x_axis_text = x_label or "Decision Threshold (risk level that triggers action)"
+        y_axis_text = y_label or "Net Benefit (clinical value per 100 patients)"
+
     fig.update_layout(
         title=dict(
             text=(
                 f"<b>{title}</b><br>"
                 f"<span style='font-size:{TYPOGRAPHY['body_size']}px;color:#666'>"
-                "Model useful where curve exceeds baselines</span>"
+                f"{subtitle_text}</span>"
             ),
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["subheading_size"]),
         ),
         xaxis=dict(
-            title=dict(text="Decision Threshold", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=x_axis_text,
+                font=dict(size=TYPOGRAPHY["axis_title_size"])
+            ),
             tickformat=".0%",
             range=list(threshold_range),
         ),
         yaxis=dict(
-            title=dict(text="Net Benefit", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=y_axis_text,
+                font=dict(size=TYPOGRAPHY["axis_title_size"])
+            ),
         ),
         legend=LEGEND_POSITIONS["top_horizontal"],
         template="faircareai",
@@ -680,24 +798,39 @@ def create_decision_curve_by_subgroup(
 
 def create_risk_distribution_plot(
     results: dict[str, Any],
-    title: str = "Risk Distribution by Demographic Subgroup",
+    title: str | None = None,
     plot_type: str = "violin",
     source_note: str | None = None,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
     """Create risk distribution plots showing probability distributions by outcome.
+
+    Van Calster et al. (2025) Classification: RECOMMENDED
+    - Risk distribution plots are essential for understanding model behavior
+    - Always shown regardless of include_optional setting
 
     Per Van Calster et al. (2025): "A plot showing probability distributions
     for each outcome category provides valuable insights into a model's behavior."
 
     Args:
         results: Dict with 'groups' containing risk distribution data.
-        title: Chart title.
+        title: Chart title. Uses persona-appropriate default if None.
         plot_type: "violin" or "box".
         source_note: Custom source note.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
 
     Returns:
         Plotly Figure with distribution plots.
+
+    Note:
+        This is a RECOMMENDED metric per Van Calster et al. (2025).
+        Separation between event and non-event distributions indicates
+        good discrimination ability.
     """
+    # Get persona-appropriate labels
+    metric_label = get_label("risk_distribution", persona, "name")
+    if title is None:
+        title = f"{metric_label} by Demographic Subgroup"
     groups = results.get("groups", {})
 
     if not groups:
@@ -818,12 +951,20 @@ def create_risk_distribution_plot(
     # Generate alt text
     alt_text = _generate_risk_distribution_alt_text(results, title)
 
+    # Persona-appropriate subtitle and y-axis label
+    if persona == OutputPersona.GOVERNANCE:
+        subtitle_text = "Wide gap between Events & Non-Events = model distinguishes well"
+        y_axis_label = "Risk Score"
+    else:
+        subtitle_text = "Wide gap between Events & Non-Events = model distinguishes well"
+        y_axis_label = "Predicted Risk Score"
+
     fig.update_layout(
         title=dict(
             text=(
                 f"<b>{title}</b><br>"
                 f"<span style='font-size:{TYPOGRAPHY['body_size']}px;color:#666'>"
-                "Greater separation indicates better discrimination</span>"
+                f"{subtitle_text}</span>"
             ),
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["subheading_size"]),
         ),
@@ -834,10 +975,10 @@ def create_risk_distribution_plot(
         meta={"description": alt_text},
     )
 
-    # Update all y-axes with JAMA-style font sizing
+    # Update all y-axes with JAMA-style font sizing and descriptive labels
     for i in range(1, n_groups + 1):
         fig.update_yaxes(
-            title_text="Predicted Probability" if i == 1 else "",
+            title_text=y_axis_label if i == 1 else "",
             title_font=dict(size=TYPOGRAPHY["axis_title_size"]),
             tickformat=".0%",
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
@@ -859,13 +1000,17 @@ def create_vancalster_dashboard(
     results: dict[str, Any],
     title: str = "Van Calster Performance Assessment",
 ) -> go.Figure:
-    """Create comprehensive dashboard with all four Van Calster recommended plots.
+    """Create comprehensive dashboard with all four Van Calster RECOMMENDED plots.
 
-    Layout:
-    - Top left: AUROC Forest Plot
-    - Top right: Calibration Curves
-    - Bottom left: Decision Curves
-    - Bottom right: Risk Distributions
+    Van Calster et al. (2025) Classification: RECOMMENDED (All 4 panels)
+    - This dashboard contains only RECOMMENDED metrics
+    - Always shown regardless of include_optional setting
+
+    Layout (all RECOMMENDED per Van Calster Table 2):
+    - Top left: AUROC Forest Plot (discrimination)
+    - Top right: Calibration Curves (calibration)
+    - Bottom left: Decision Curves (clinical utility)
+    - Bottom right: Risk Distributions (overall performance)
 
     Args:
         results: Full results from compute_vancalster_metrics().
@@ -873,6 +1018,10 @@ def create_vancalster_dashboard(
 
     Returns:
         Plotly Figure with 2x2 subplot dashboard.
+
+    Note:
+        This dashboard contains only RECOMMENDED metrics from Van Calster et al. (2025).
+        It is the primary visualization for governance and regulatory reporting.
     """
     subgroup_results = results.get("by_subgroup", {})
 

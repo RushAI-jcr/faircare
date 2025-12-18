@@ -5,6 +5,53 @@ All notable changes to FairCareAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-12-17
+
+### Added
+
+- **Two Output Personas**
+  - Data Scientist persona: Full technical reports (15-20+ pages) for model validation
+  - Governance persona: Streamlined 3-5 page reports for committee review
+  - New export methods: `to_governance_html()`, `to_governance_pdf()`
+  - Persona parameter: `results.to_html(persona="governance")`
+
+- **Van Calster et al. (2025) Visualizations**
+  - 4 overall performance figures: AUROC gauge, Calibration plot, Brier score, Classification metrics
+  - 4 subgroup fairness figures: AUROC by group, Sensitivity (TPR), FPR, Selection rate
+  - Plain language explanations on every figure for non-technical audiences
+
+- **Plain Language Explanations**
+  - Crystal-clear X/Y axis labels (e.g., "Predicted Risk (what the model says)")
+  - "What to look for" guidance boxes in reports
+  - Clinical interpretation guidance for governance committees
+  - Metric glossaries with lay explanations
+
+- **Publication-Ready Typography**
+  - Minimum 14px font size throughout all visualizations
+  - JAMA-compliant styling standards
+  - Dynamic chart heights that scale with data
+  - Generous margins preventing text truncation
+
+- **CHAI RAIC Framework Alignment**
+  - 7 governance report sections mapped to CHAI checkpoints
+  - Advisory disclaimer banner: "Package SUGGESTS, humans DECIDE"
+  - Detection-based language ("No Issues Detected" vs "Ready for Deployment")
+
+### Changed
+
+- Improved all figure legend text for clarity and accessibility
+- Updated disclaimer fonts from 10-13px to 14px minimum
+- Enhanced table font sizes for better readability
+- Refined axis labels for clinical interpretation
+
+### Fixed
+
+- Font size consistency across all governance dashboard figures
+- Table header and cell font sizes for publication standards
+- Waterfall chart subtitle legibility
+
+---
+
 ## [0.2.0] - 2024-12-09
 
 ### Added

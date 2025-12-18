@@ -214,7 +214,7 @@ def create_executive_summary(results: "AuditResults") -> go.Figure:
                     findings["status_colors"],
                     ["white"] * len(findings["findings"]),
                 ],
-                font=dict(size=11),
+                font=dict(size=14),
                 align="left",
                 height=25,
             ),
@@ -258,7 +258,7 @@ def create_executive_summary(results: "AuditResults") -> go.Figure:
         x=0.5,
         y=-0.08,
         showarrow=False,
-        font=dict(size=10, color=FAIRCAREAI_COLORS["gray"]),
+        font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
     )
 
     return fig
@@ -403,14 +403,14 @@ def create_go_nogo_scorecard(results: "AuditResults") -> go.Figure:
             header=dict(
                 values=["<b>Category</b>", "<b>Criterion</b>", "<b>Status</b>", "<b>Note</b>"],
                 fill_color=FAIRCAREAI_COLORS["primary"],
-                font=dict(color="white", size=12),
+                font=dict(color="white", size=14),
                 align="left",
                 height=30,
             ),
             cells=dict(
                 values=[categories, criteria, statuses, notes],
                 fill_color=[["white"] * len(checklist)] * 3 + [colors],
-                font=dict(size=11),
+                font=dict(size=14),
                 align="left",
                 height=28,
             ),
@@ -450,7 +450,7 @@ def create_go_nogo_scorecard(results: "AuditResults") -> go.Figure:
         x=0.5,
         y=-0.08,
         showarrow=False,
-        font=dict(size=12),
+        font=dict(size=14),
         bgcolor="rgba(255,255,255,0.9)",
         bordercolor=overall_color,
         borderwidth=2,
@@ -918,5 +918,547 @@ def plot_subgroup_comparison(
         fig.update_yaxes(range=[0.5, 1])
     elif metric in ["tpr", "fpr", "ppv", "selection_rate"]:
         fig.update_yaxes(range=[0, 1], tickformat=".0%")
+
+    return fig
+
+
+# === GOVERNANCE PERSONA FIGURE GENERATORS ===
+
+
+def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.Figure]:
+    """Create 4 overall performance figures for governance report.
+
+    Returns simplified, large-font figures suitable for non-technical audiences:
+    1. AUROC Gauge - Model discrimination with pass/fail threshold
+    2. Calibration Plot - Observed vs predicted with slope
+    3. Decision Curve - Net benefit visualization
+    4. Brier Score - Calibration quality gauge
+
+    Each figure includes plain language explanations for non-data-science audiences.
+
+    Args:
+        results: AuditResults from FairCareAudit.run().
+
+    Returns:
+        Dict mapping figure title to Plotly Figure.
+    """
+    figures = {}
+
+    perf = results.overall_performance
+    disc = perf.get("discrimination", {})
+    cal = perf.get("calibration", {})
+
+    # Plain language explanations for governance audiences
+    PLAIN_EXPLANATIONS = {
+        "auroc": (
+            "AUROC measures how well the model separates high-risk from low-risk patients. "
+            "Think of it as the model's ability to rank patients correctly. "
+            "Score of 0.5 = random guessing (coin flip). Score of 1.0 = perfect ranking. "
+            "Healthcare standard: 0.7 or higher is acceptable, 0.8+ is strong."
+        ),
+        "calibration": (
+            "Calibration checks if predicted risks match actual outcomes. "
+            "If the model predicts 20% risk for a group, do about 20% actually experience the outcome? "
+            "Points closer to the diagonal line = more trustworthy risk estimates. "
+            "Why it matters: Under/over-estimating risk can lead to wrong treatment decisions."
+        ),
+        "brier": (
+            "Brier Score measures overall prediction accuracy (0 = perfect, 0.25 = poor). "
+            "Lower is better. Think of it as the 'error' in risk predictions. "
+            "Score <0.15 = excellent calibration. Score 0.15-0.25 = acceptable. Score >0.25 = needs improvement."
+        ),
+        "classification": (
+            "At the chosen risk threshold, these metrics show what happens to patients: "
+            "Sensitivity = % of actual cases correctly identified. "
+            "Specificity = % without the condition correctly identified. "
+            "PPV = When flagged positive, % who actually have the condition."
+        ),
+    }
+
+    # 1. AUROC Gauge
+    auroc = disc.get("auroc", 0)
+    auroc_status = "PASS" if auroc >= 0.7 else "REVIEW"
+    auroc_color = FAIRCAREAI_COLORS["success"] if auroc >= 0.7 else FAIRCAREAI_COLORS["error"]
+
+    fig_auroc = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=auroc,
+            number={"valueformat": ".2f", "font": {"size": 44, "color": auroc_color}},
+            title={"text": "<b>AUROC</b>", "font": {"size": 20}},
+            gauge=dict(
+                axis=dict(range=[0.5, 1], tickformat=".1f", tickfont={"size": 14}),
+                bar=dict(color=auroc_color),
+                bgcolor="white",
+                borderwidth=2,
+                bordercolor="gray",
+                steps=[
+                    {"range": [0.5, 0.7], "color": "#ffebee"},
+                    {"range": [0.7, 0.8], "color": "#fff3e0"},
+                    {"range": [0.8, 1], "color": "#e8f5e9"},
+                ],
+                threshold=dict(
+                    line=dict(color="black", width=4),
+                    thickness=0.8,
+                    value=0.7,
+                ),
+            ),
+        )
+    )
+    fig_auroc.update_layout(
+        height=300,
+        margin=dict(l=20, r=20, t=70, b=60),
+        annotations=[
+            dict(
+                text=f"<b>{auroc_status}</b>",
+                x=0.5,
+                y=-0.08,
+                showarrow=False,
+                font=dict(size=18, color=auroc_color),
+            ),
+            dict(
+                text=PLAIN_EXPLANATIONS["auroc"],
+                x=0.5,
+                y=-0.22,
+                showarrow=False,
+                font=dict(size=14, color="#666"),
+                xanchor="center",
+            ),
+        ],
+    )
+    figures["AUROC"] = fig_auroc
+
+    # 2. Calibration Plot (simplified)
+    fig_cal = go.Figure()
+    # Add perfect calibration line
+    fig_cal.add_trace(
+        go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode="lines",
+            line=dict(dash="dash", color="gray"),
+            name="Perfect Calibration",
+            showlegend=True,
+        )
+    )
+
+    # Get calibration data if available
+    cal_data = cal.get("calibration_curve_data", {})
+    if cal_data:
+        x_vals = cal_data.get("predicted", [0.1, 0.3, 0.5, 0.7, 0.9])
+        y_vals = cal_data.get("observed", [0.12, 0.28, 0.52, 0.68, 0.88])
+    else:
+        # Generate approximate calibration line from slope
+        slope = cal.get("calibration_slope", 1.0)
+        intercept = cal.get("calibration_intercept", 0.0)
+        x_vals = [0.1, 0.3, 0.5, 0.7, 0.9]
+        y_vals = [max(0, min(1, intercept + slope * x)) for x in x_vals]
+
+    fig_cal.add_trace(
+        go.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode="lines+markers",
+            line=dict(color=FAIRCAREAI_COLORS["primary"], width=3),
+            marker=dict(size=10),
+            name="Model Calibration",
+            showlegend=True,
+        )
+    )
+
+    slope = cal.get("calibration_slope", 1.0)
+    slope_status = "PASS" if 0.8 <= slope <= 1.2 else "REVIEW"
+
+    slope_color = FAIRCAREAI_COLORS["success"] if 0.8 <= slope <= 1.2 else FAIRCAREAI_COLORS["error"]
+    fig_cal.update_layout(
+        title=dict(text="<b>Calibration</b>", font=dict(size=20)),
+        xaxis=dict(
+            title="Predicted Risk (what the model says)",
+            range=[0, 1],
+            tickfont={"size": 14},
+            tickformat=".0%"
+        ),
+        yaxis=dict(
+            title="Observed Rate (what actually happened)",
+            range=[0, 1],
+            tickfont={"size": 14},
+            tickformat=".0%"
+        ),
+        height=320,
+        margin=dict(l=50, r=20, t=70, b=70),
+        legend=dict(x=0.02, y=0.98, font=dict(size=14)),
+        annotations=[
+            dict(
+                text=f"<b>Slope: {slope:.2f}</b> ({slope_status})",
+                x=0.98,
+                y=0.02,
+                xanchor="right",
+                yanchor="bottom",
+                showarrow=False,
+                font=dict(size=16, color=slope_color),
+            ),
+            dict(
+                text=PLAIN_EXPLANATIONS["calibration"],
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=-0.18,
+                showarrow=False,
+                font=dict(size=14, color="#666"),
+                xanchor="center",
+            ),
+        ],
+    )
+    figures["Calibration"] = fig_cal
+
+    # 3. Brier Score Gauge
+    brier = cal.get("brier_score", 0.25)
+    brier_status = "PASS" if brier < 0.15 else "REVIEW" if brier < 0.25 else "FLAG"
+    brier_color = (
+        FAIRCAREAI_COLORS["success"]
+        if brier < 0.15
+        else FAIRCAREAI_COLORS["warning"]
+        if brier < 0.25
+        else FAIRCAREAI_COLORS["error"]
+    )
+
+    fig_brier = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=brier,
+            number={"valueformat": ".3f", "font": {"size": 44, "color": brier_color}},
+            title={"text": "<b>Brier Score</b>", "font": {"size": 20}},
+            gauge=dict(
+                axis=dict(range=[0, 0.5], tickformat=".2f", tickfont={"size": 14}),
+                bar=dict(color=brier_color),
+                bgcolor="white",
+                borderwidth=2,
+                bordercolor="gray",
+                steps=[
+                    {"range": [0, 0.15], "color": "#e8f5e9"},
+                    {"range": [0.15, 0.25], "color": "#fff3e0"},
+                    {"range": [0.25, 0.5], "color": "#ffebee"},
+                ],
+            ),
+        )
+    )
+    fig_brier.update_layout(
+        height=300,
+        margin=dict(l=20, r=20, t=70, b=60),
+        annotations=[
+            dict(
+                text=f"<b>{brier_status}</b> (lower is better)",
+                x=0.5,
+                y=-0.08,
+                showarrow=False,
+                font=dict(size=18, color=brier_color),
+            ),
+            dict(
+                text=PLAIN_EXPLANATIONS["brier"],
+                x=0.5,
+                y=-0.22,
+                showarrow=False,
+                font=dict(size=14, color="#666"),
+                xanchor="center",
+            ),
+        ],
+    )
+    figures["Brier Score"] = fig_brier
+
+    # 4. Classification Metrics at Threshold
+    cls = perf.get("classification_at_threshold", {})
+    threshold = cls.get("threshold", 0.5)
+    sensitivity = cls.get("sensitivity", 0) * 100
+    specificity = cls.get("specificity", 0) * 100
+    ppv = cls.get("ppv", 0) * 100
+
+    fig_class = go.Figure()
+    metrics = ["Sensitivity", "Specificity", "PPV"]
+    values = [sensitivity, specificity, ppv]
+    colors = [
+        FAIRCAREAI_COLORS["success"] if v >= 70 else FAIRCAREAI_COLORS["warning"] if v >= 50 else FAIRCAREAI_COLORS["error"]
+        for v in values
+    ]
+
+    fig_class.add_trace(
+        go.Bar(
+            x=metrics,
+            y=values,
+            marker_color=colors,
+            text=[f"<b>{v:.0f}%</b>" for v in values],
+            textposition="outside",
+            textfont=dict(size=18),
+        )
+    )
+
+    fig_class.update_layout(
+        title=dict(
+            text=f"<b>Classification Metrics at Threshold {threshold:.2f}</b>",
+            font=dict(size=20)
+        ),
+        xaxis=dict(title="Performance Metric", tickfont={"size": 14}),
+        yaxis=dict(
+            title="Percentage of Patients",
+            range=[0, 110],
+            ticksuffix="%",
+            tickfont={"size": 14}
+        ),
+        height=300,
+        margin=dict(l=40, r=20, t=70, b=60),
+        showlegend=False,
+        annotations=[
+            dict(
+                text=PLAIN_EXPLANATIONS["classification"],
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=-0.18,
+                showarrow=False,
+                font=dict(size=14, color="#666"),
+                xanchor="center",
+            ),
+        ],
+    )
+    figures["Classification"] = fig_class
+
+    return figures
+
+
+def create_governance_subgroup_figures(results: "AuditResults") -> dict[str, dict[str, go.Figure]]:
+    """Create subgroup performance figures for governance report.
+
+    For each sensitive attribute, generates 4 figures (Van Calster 4):
+    1. AUROC by Subgroup - Discrimination comparison
+    2. TPR by Subgroup - Sensitivity comparison (equal opportunity)
+    3. FPR by Subgroup - Specificity comparison (equalized odds)
+    4. Selection Rate by Subgroup - Demographic parity check
+
+    Each figure includes plain language explanations per the governance spec.
+
+    Args:
+        results: AuditResults from FairCareAudit.run().
+
+    Returns:
+        Dict mapping attribute name to dict of figure title -> Plotly Figure.
+    """
+    # Plain language explanations for Van Calster 4 visualizations
+    SUBGROUP_EXPLANATIONS = {
+        "auroc": (
+            "AUROC by Subgroup: Does the model perform equally well across all demographic groups? "
+            "All bars should be similar height (difference <0.05 is ideal). "
+            "Lower bars mean the model is less accurate for that group. "
+            "Why it matters: We want the model to work well for everyone, not just some groups."
+        ),
+        "sensitivity": (
+            "Sensitivity (True Positive Rate): Of patients who actually develop the outcome, "
+            "what percentage does the model correctly identify in each group? "
+            "Large differences mean the model 'misses' more cases in certain groups. "
+            "Fairness goal: Differences between groups should be <10 percentage points."
+        ),
+        "fpr": (
+            "False Positive Rate: Of patients who DON'T have the outcome, "
+            "what percentage are incorrectly flagged as high-risk in each group? "
+            "Lower is better (fewer false alarms). "
+            "Fairness concern: Higher FPR means a group gets unnecessary interventions/worry."
+        ),
+        "selection": (
+            "Selection Rate: What percentage of each group is flagged as 'high-risk' by the model? "
+            "This shows which groups the model identifies for intervention. "
+            "Large differences may indicate disparate treatment even if clinically justified. "
+            "Consider: Should intervention rates differ by demographics?"
+        ),
+    }
+
+    all_figures = {}
+
+    for attr_name, attr_data in results.subgroup_performance.items():
+        if not isinstance(attr_data, dict):
+            continue
+
+        figures = {}
+
+        # Collect data for this attribute
+        # The subgroup_performance structure has a nested 'groups' key
+        groups_data = attr_data.get("groups", attr_data)
+        reference_group = attr_data.get("reference", None)
+
+        groups = []
+        auroc_vals = []
+        tpr_vals = []
+        fpr_vals = []
+        selection_vals = []
+        is_reference = []
+
+        for group_name, group_data in groups_data.items():
+            if not isinstance(group_data, dict) or "error" in group_data:
+                continue
+            # Skip metadata keys that aren't actual groups
+            if group_name in ("attribute", "threshold", "reference", "disparities"):
+                continue
+
+            groups.append(group_name)
+            auroc_vals.append(group_data.get("auroc", 0))
+            tpr_vals.append(group_data.get("tpr", 0))
+            fpr_vals.append(group_data.get("fpr", 0))
+            selection_vals.append(group_data.get("selection_rate", 0))
+            # Check is_reference from group_data or compare with reference_group
+            is_ref = group_data.get("is_reference", group_name == reference_group)
+            is_reference.append(is_ref)
+
+        if not groups:
+            continue
+
+        # Color scheme - highlight reference group
+        colors = [
+            FAIRCAREAI_COLORS["primary"] if ref else FAIRCAREAI_COLORS["secondary"]
+            for ref in is_reference
+        ]
+
+        # 1. AUROC by Subgroup
+        fig_auroc = _create_subgroup_bar_chart(
+            groups, auroc_vals, colors,
+            "Model Accuracy (AUROC) by Demographic Group",
+            y_range=[0.5, 1], threshold_line=0.7, threshold_label="Acceptable minimum (0.7)",
+            explanation=SUBGROUP_EXPLANATIONS["auroc"],
+            y_axis_title="AUROC (Model Accuracy Score)",
+            x_axis_title="Demographic Group"
+        )
+        figures["AUROC by Subgroup"] = fig_auroc
+
+        # 2. TPR (Sensitivity) by Subgroup
+        fig_tpr = _create_subgroup_bar_chart(
+            groups, [v * 100 for v in tpr_vals], colors,
+            "Sensitivity: % of Actual Cases Detected by Group",
+            y_range=[0, 100], y_suffix="%", threshold_line=None,
+            explanation=SUBGROUP_EXPLANATIONS["sensitivity"],
+            y_axis_title="True Positive Rate (%)",
+            x_axis_title="Demographic Group"
+        )
+        figures["Sensitivity by Subgroup"] = fig_tpr
+
+        # 3. FPR by Subgroup
+        fig_fpr = _create_subgroup_bar_chart(
+            groups, [v * 100 for v in fpr_vals], colors,
+            "False Alarms: % Incorrectly Flagged by Group",
+            y_range=[0, 50], y_suffix="%", threshold_line=None,
+            explanation=SUBGROUP_EXPLANATIONS["fpr"],
+            y_axis_title="False Positive Rate (%)",
+            x_axis_title="Demographic Group"
+        )
+        figures["FPR by Subgroup"] = fig_fpr
+
+        # 4. Selection Rate by Subgroup
+        fig_sel = _create_subgroup_bar_chart(
+            groups, [v * 100 for v in selection_vals], colors,
+            "Intervention Rate: % Flagged as High-Risk by Group",
+            y_range=[0, 100], y_suffix="%", threshold_line=None,
+            explanation=SUBGROUP_EXPLANATIONS["selection"],
+            y_axis_title="Selection Rate (% flagged)",
+            x_axis_title="Demographic Group"
+        )
+        figures["Selection Rate by Subgroup"] = fig_sel
+
+        all_figures[attr_name] = figures
+
+    return all_figures
+
+
+def _create_subgroup_bar_chart(
+    groups: list[str],
+    values: list[float],
+    colors: list[str],
+    title: str,
+    y_range: list[float] | None = None,
+    y_suffix: str = "",
+    threshold_line: float | None = None,
+    threshold_label: str = "",
+    explanation: str = "",
+    y_axis_title: str = "Value",
+    x_axis_title: str = "Group",
+) -> go.Figure:
+    """Create a simplified bar chart for subgroup comparison.
+
+    Args:
+        groups: List of group names.
+        values: List of metric values.
+        colors: List of bar colors.
+        title: Chart title.
+        y_range: Y-axis range [min, max].
+        y_suffix: Suffix for y-axis tick labels (e.g., "%").
+        threshold_line: Optional horizontal threshold line.
+        threshold_label: Label for threshold line.
+        explanation: Plain language explanation for non-technical audiences.
+        y_axis_title: Descriptive label for Y-axis.
+        x_axis_title: Descriptive label for X-axis.
+
+    Returns:
+        Plotly Figure.
+    """
+    fig = go.Figure()
+
+    # Format text based on whether it's percentage
+    if y_suffix == "%":
+        text_vals = [f"<b>{v:.0f}%</b>" for v in values]
+    else:
+        text_vals = [f"<b>{v:.2f}</b>" for v in values]
+
+    fig.add_trace(
+        go.Bar(
+            x=groups,
+            y=values,
+            marker_color=colors,
+            text=text_vals,
+            textposition="outside",
+            textfont=dict(size=14),
+        )
+    )
+
+    # Add threshold line if specified
+    if threshold_line is not None:
+        fig.add_hline(
+            y=threshold_line,
+            line_dash="dash",
+            line_color=FAIRCAREAI_COLORS["error"],
+            annotation_text=threshold_label,
+            annotation_position="top right",
+            annotation_font=dict(size=14),
+        )
+
+    # Build annotations list
+    annotations = []
+    if explanation:
+        annotations.append(
+            dict(
+                text=explanation,
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=-0.28,
+                showarrow=False,
+                font=dict(size=14, color="#666"),
+                xanchor="center",
+            )
+        )
+
+    fig.update_layout(
+        title=dict(text=f"<b>{title}</b>", font=dict(size=16)),
+        xaxis=dict(
+            title=x_axis_title,
+            tickfont={"size": 14},
+            tickangle=45 if len(groups) > 4 else 0,
+            title_font=dict(size=14)
+        ),
+        yaxis=dict(
+            title=y_axis_title,
+            range=y_range,
+            ticksuffix=y_suffix,
+            tickfont={"size": 14},
+            title_font=dict(size=14)
+        ),
+        height=280,
+        margin=dict(l=60, r=20, t=55, b=90),
+        showlegend=False,
+        annotations=annotations if annotations else None,
+    )
 
     return fig

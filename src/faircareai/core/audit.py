@@ -42,6 +42,34 @@ class FairCareAudit:
     Designed for data scientists to present fairness analysis results
     to governance stakeholders.
 
+    Data Requirements:
+        Your data must contain:
+
+        1. **Prediction Column** (pred_col): Model-generated probabilities
+           - Values must be in range [0.0, 1.0]
+           - Example: risk_score, predicted_prob, mortality_risk
+
+        2. **Target Column** (target_col): Actual binary outcomes
+           - Values must be exactly 0 or 1
+           - Example: readmit_30d, mortality, los_gt_7
+
+        3. **Sensitive Attribute Columns**: Demographics for fairness analysis
+           - Categorical columns like race, sex, age_group, insurance
+           - Auto-detected or manually specified via add_sensitive_attribute()
+
+    Output Personas:
+        FairCareAudit supports two output personas for different audiences:
+
+        - **Data Scientist** (default): Full technical output with all metrics,
+          confidence intervals, detailed tables, and ~15-20 figures.
+
+        - **Governance**: Streamlined 3-5 page output with 8 key figures,
+          plain language summaries, and clear decision blocks.
+
+        Select persona when exporting:
+        >>> results.to_pdf("full_report.pdf")  # Data scientist (default)
+        >>> results.to_pdf("governance.pdf", persona="governance")
+
     Example:
         >>> from faircareai import FairCareAudit, FairnessConfig
         >>> from faircareai.core.config import FairnessMetric, UseCaseType
@@ -56,8 +84,16 @@ class FairCareAudit:
         >>> # See suggested sensitive attributes
         >>> audit.suggest_attributes()
         >>>
-        >>> # Accept suggestions
+        >>> # Accept suggestions (1-indexed)
         >>> audit.accept_suggested_attributes([1, 2])  # race, sex
+        >>>
+        >>> # Or manually add sensitive attributes
+        >>> audit.add_sensitive_attribute(
+        ...     name="race",
+        ...     column="patient_race",
+        ...     reference="White",
+        ...     clinical_justification="Historical disparities in care"
+        ... )
         >>>
         >>> # Get fairness metric recommendation
         >>> audit.suggest_fairness_metric()
@@ -72,9 +108,13 @@ class FairCareAudit:
         >>> audit.config = config
         >>> results = audit.run()
         >>>
-        >>> # Visualize for governance
-        >>> results.plot_executive_summary()
-        >>> results.to_html("report.html")
+        >>> # Export for data scientist (full technical output)
+        >>> results.to_html("full_report.html")
+        >>> results.to_pdf("full_report.pdf")
+        >>>
+        >>> # Export for governance (streamlined 3-5 page output)
+        >>> results.to_governance_pdf("governance.pdf")
+        >>> results.to_html("governance.html", persona="governance")
     """
 
     def __init__(
@@ -89,11 +129,60 @@ class FairCareAudit:
         Initialize a fairness audit.
 
         Args:
-            data: Polars DataFrame or path to parquet/csv file.
-            pred_col: Column name for model predictions/probabilities.
-            target_col: Column name for actual outcomes (0/1).
-            config: Full configuration object (can set later).
-            threshold: Decision threshold for binary classification.
+            data: Model predictions data. Accepts:
+                - Polars DataFrame (preferred)
+                - pandas DataFrame (auto-converted to Polars)
+                - Path to .parquet or .csv file
+
+            pred_col: Column name containing model predictions as probabilities.
+                Must be numeric values in the range [0.0, 1.0].
+
+                Examples of valid column names:
+                - "risk_score" - Generic risk score
+                - "predicted_prob" - Predicted probability
+                - "readmission_prob" - Readmission probability
+                - "mortality_risk" - Mortality risk score
+
+            target_col: Column name containing actual outcomes as binary values.
+                Must be numeric values of exactly 0 or 1.
+
+                Examples of valid column names:
+                - "readmit_30d" - 30-day readmission outcome
+                - "mortality" - Mortality outcome
+                - "outcome" - Generic outcome
+                - "los_gt_7" - Length of stay > 7 days
+
+            config: FairnessConfig object with audit settings. Can be set later
+                via `audit.config = FairnessConfig(...)`. Required fields:
+                - model_name: Name of the model being audited
+                - primary_fairness_metric: Selected fairness metric (use suggest_fairness_metric())
+                - fairness_justification: Rationale for metric selection
+
+            threshold: Decision threshold for converting probabilities to binary
+                predictions. Default is 0.5. Adjust based on clinical context.
+
+        Example:
+            >>> # From parquet file
+            >>> audit = FairCareAudit(
+            ...     data="predictions.parquet",
+            ...     pred_col="risk_score",
+            ...     target_col="readmit_30d"
+            ... )
+
+            >>> # From pandas DataFrame
+            >>> import pandas as pd
+            >>> df = pd.DataFrame({
+            ...     "risk_score": [0.2, 0.7, 0.4, 0.9],
+            ...     "readmit_30d": [0, 1, 0, 1],
+            ...     "race": ["White", "Black", "Hispanic", "White"],
+            ...     "sex": ["M", "F", "M", "F"]
+            ... })
+            >>> audit = FairCareAudit(df, "risk_score", "readmit_30d")
+
+        Note:
+            After initialization, use suggest_attributes() to see auto-detected
+            sensitive attributes, then accept_suggested_attributes() or
+            add_sensitive_attribute() to define which demographics to analyze.
         """
         self.df = self._load_data(data)
         self.pred_col = pred_col
@@ -336,15 +425,92 @@ class FairCareAudit:
         """
         Add a sensitive attribute for fairness analysis.
 
+        Sensitive attributes are demographic or social characteristics used to
+        assess fairness across patient subgroups. Common examples include race,
+        sex, age group, insurance type, and language.
+
         Args:
-            name: Display name for the attribute (e.g., "race", "sex").
-            column: Column name in data (defaults to name).
-            reference: Reference group for disparity calculations.
-            categories: Expected category values.
-            clinical_justification: CHAI-required justification.
+            name: Display name for the attribute in reports and visualizations.
+                Use a clear, descriptive name (e.g., "race", "sex", "insurance").
+
+            column: Column name in your data containing this attribute.
+                Defaults to `name` if not specified. Use this when your column
+                name differs from the display name.
+
+            reference: Reference group for disparity calculations. Disparities
+                are computed as (group_metric / reference_metric). If not specified,
+                defaults to the largest group or standard clinical reference:
+                - Race: "White"
+                - Sex: "Male"
+                - Insurance: "Commercial"
+
+            categories: List of expected category values. If specified, validates
+                that all values in the data match expected categories.
+
+            clinical_justification: CHAI-required documentation of why this
+                attribute is relevant for fairness analysis in your clinical context.
 
         Returns:
             self: For method chaining.
+
+        Examples:
+            >>> # Race/Ethnicity - common healthcare demographic
+            >>> audit.add_sensitive_attribute(
+            ...     name="race",
+            ...     column="patient_race",  # Your column name
+            ...     reference="White",
+            ...     clinical_justification="Historical disparities in healthcare access and outcomes"
+            ... )
+
+            >>> # Sex/Gender
+            >>> audit.add_sensitive_attribute(
+            ...     name="sex",
+            ...     column="birth_sex",
+            ...     reference="Male",
+            ...     categories=["Male", "Female"],
+            ...     clinical_justification="Biological and social factors affecting disease presentation"
+            ... )
+
+            >>> # Age Group
+            >>> audit.add_sensitive_attribute(
+            ...     name="age_group",
+            ...     column="age_category",
+            ...     reference="45-64",  # Working-age adults as reference
+            ...     categories=["18-44", "45-64", "65-74", "75+"],
+            ...     clinical_justification="Age-related differences in treatment response and risk"
+            ... )
+
+            >>> # Insurance/Payer Type
+            >>> audit.add_sensitive_attribute(
+            ...     name="insurance",
+            ...     column="payer_type",
+            ...     reference="Commercial",
+            ...     categories=["Commercial", "Medicare", "Medicaid", "Uninsured"],
+            ...     clinical_justification="Insurance status affects access to preventive care"
+            ... )
+
+            >>> # Primary Language
+            >>> audit.add_sensitive_attribute(
+            ...     name="language",
+            ...     column="preferred_language",
+            ...     reference="English",
+            ...     clinical_justification="Language barriers may affect care coordination"
+            ... )
+
+            >>> # Custom attribute (e.g., geographic)
+            >>> audit.add_sensitive_attribute(
+            ...     name="rural_urban",
+            ...     column="geographic_type",
+            ...     reference="Urban",
+            ...     categories=["Urban", "Suburban", "Rural"],
+            ...     clinical_justification="Rural patients may face transportation and access barriers"
+            ... )
+
+        Note:
+            FairCareAI auto-detects common sensitive attribute columns.
+            Use suggest_attributes() to see auto-detected columns, then
+            accept_suggested_attributes() for quick setup, or use this method
+            for full control over attribute configuration.
         """
         col = column or name
 
@@ -418,12 +584,43 @@ class FairCareAudit:
         """
         Execute the fairness audit.
 
+        Computes all fairness and performance metrics based on the configured
+        sensitive attributes and fairness criteria. Results can be exported
+        in two personas: full technical output for data scientists, or
+        streamlined output for governance committees.
+
         Args:
-            bootstrap_ci: Calculate bootstrap confidence intervals.
-            n_bootstrap: Number of bootstrap iterations.
+            bootstrap_ci: Calculate bootstrap confidence intervals for all
+                metrics. Recommended for statistical rigor. Default: True.
+            n_bootstrap: Number of bootstrap iterations for confidence
+                intervals. Higher values increase precision but take longer.
+                Default: 1000.
 
         Returns:
-            AuditResults with all metrics and visualization methods.
+            AuditResults object containing all computed metrics and methods for:
+            - Visualization: plot_executive_summary(), plot_forest_plot(), etc.
+            - Export: to_html(), to_pdf(), to_pptx()
+            - Governance export: to_governance_html(), to_governance_pdf()
+
+        Raises:
+            ConfigurationError: If required config fields are missing
+                (primary_fairness_metric, fairness_justification).
+            ConfigurationError: If no sensitive attributes have been added.
+
+        Example:
+            >>> # Run audit with confidence intervals
+            >>> results = audit.run(bootstrap_ci=True, n_bootstrap=1000)
+            >>>
+            >>> # View executive summary
+            >>> results.plot_executive_summary()
+            >>>
+            >>> # Export full technical report (Data Scientist persona)
+            >>> results.to_pdf("full_report.pdf")
+            >>>
+            >>> # Export streamlined report (Governance persona)
+            >>> results.to_governance_pdf("governance.pdf")
+            >>> # Or equivalently:
+            >>> results.to_pdf("governance.pdf", persona="governance")
         """
         # Validate config
         config_issues = self.config.validate()

@@ -338,8 +338,42 @@ Then create a Pull Request on GitHub with:
 1. Add function in appropriate `visualization/*.py` file
 2. Follow Okabe-Ito palette (use `themes.py`)
 3. Ensure WCAG 2.1 AA compliance
-4. Add to `AuditResults` if needed
-5. Write tests
+4. **Use minimum 14px font size for all text**
+5. **Include plain language explanation for governance persona**
+6. Add to `AuditResults` if needed
+7. Write tests
+8. Update `FIGURE_LEGEND_REFERENCE.md`
+
+### Plain Language Standards
+
+All visualizations must include plain language explanations for governance audiences:
+
+```python
+PLAIN_EXPLANATIONS = {
+    "my_metric": (
+        "Plain language explanation of what this metric shows. "
+        "Include: What to look for, why it matters, and thresholds. "
+        "Avoid jargon. Write at 8th grade reading level."
+    ),
+}
+```
+
+**Axis Label Guidelines:**
+- X-axis: Include what AND context (e.g., "Predicted Risk (what the model says)")
+- Y-axis: Include what AND context (e.g., "Observed Rate (what actually happened)")
+- Use % where appropriate for clinical interpretation
+
+### Typography Standards
+
+All visualizations must meet publication-ready standards:
+
+| Element | Minimum Size | Recommended |
+|---------|-------------|-------------|
+| Body text | 14px | 16-18px |
+| Axis labels | 14px | 16px |
+| Annotations | 14px | 14-16px |
+| Titles | 16px | 20px |
+| Table cells | 14px | 14-16px |
 
 ### New Export Format
 

@@ -8,13 +8,36 @@ WCAG 2.1 AA Compliance:
 - All charts support alt text generation for screen readers
 - Color choices from colorblind-safe Okabe-Ito palette
 - Sufficient contrast ratios for text and data elements
+
+Van Calster et al. (2025) Alignment:
+- RECOMMENDED metrics shown by default (AUROC, calibration plot)
+- OPTIONAL metrics (Sens, Spec, PPV, NPV) require include_optional=True
+- CAUTION metrics (Accuracy, F1) require explicit show_caution=True
 """
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import plotly.graph_objects as go
 import polars as pl
 from plotly.subplots import make_subplots
 from sklearn.metrics import auc, roc_curve
+
+if TYPE_CHECKING:
+    pass
+
+from faircareai.core.config import (
+    OutputPersona,
+    get_axis_labels,
+    get_label,
+)
+from faircareai.core.constants import (
+    VANCALSTER_ALL_CAUTION,
+    VANCALSTER_ALL_OPTIONAL,
+    VANCALSTER_ALL_RECOMMENDED,
+)
 
 from .themes import (
     COLORSCALES,
@@ -32,6 +55,74 @@ from .themes import (
 )
 
 register_plotly_template()
+
+
+# =============================================================================
+# VAN CALSTER METRIC FILTERING
+# =============================================================================
+
+
+def _get_metric_category(metric: str) -> str:
+    """Get Van Calster category for a metric.
+
+    Args:
+        metric: Metric name (case-insensitive).
+
+    Returns:
+        One of "RECOMMENDED", "OPTIONAL", "CAUTION", or "UNKNOWN".
+    """
+    metric_lower = metric.lower()
+    if metric_lower in VANCALSTER_ALL_RECOMMENDED:
+        return "RECOMMENDED"
+    if metric_lower in VANCALSTER_ALL_OPTIONAL:
+        return "OPTIONAL"
+    if metric_lower in VANCALSTER_ALL_CAUTION:
+        return "CAUTION"
+    return "UNKNOWN"
+
+
+def _should_show_metric(
+    metric: str,
+    include_optional: bool = False,
+    include_caution: bool = False,
+) -> bool:
+    """Check if metric should be shown based on Van Calster classification.
+
+    Args:
+        metric: Metric name.
+        include_optional: Whether to include OPTIONAL metrics.
+        include_caution: Whether to include CAUTION metrics (use sparingly).
+
+    Returns:
+        True if metric should be displayed.
+    """
+    category = _get_metric_category(metric)
+    if category == "RECOMMENDED":
+        return True
+    if category == "OPTIONAL":
+        return include_optional
+    if category == "CAUTION":
+        return include_caution
+    # Unknown metrics shown if include_optional (Data Scientist mode)
+    return include_optional
+
+
+def _filter_metrics(
+    metrics: list[str],
+    include_optional: bool = False,
+    include_caution: bool = False,
+) -> list[str]:
+    """Filter metrics based on Van Calster classification.
+
+    Args:
+        metrics: List of metric names.
+        include_optional: Whether to include OPTIONAL metrics.
+        include_caution: Whether to include CAUTION metrics.
+
+    Returns:
+        Filtered list of metrics.
+    """
+    return [m for m in metrics if _should_show_metric(m, include_optional, include_caution)]
 
 
 # =============================================================================
@@ -245,9 +336,13 @@ def create_forest_plot(
     safe_zone_min: float = 0.8,
     reference_line: float | None = None,
     source_note: str | None = None,
+    include_optional: bool = True,
 ) -> go.Figure:
-    """
-    Create NYT-style forest plot with CI whiskers and ghosting.
+    """Create NYT-style forest plot with CI whiskers and ghosting.
+
+    Van Calster et al. (2025) Classification:
+    - Default metrics (tpr, fpr, ppv) are OPTIONAL
+    - AUROC is RECOMMENDED - use create_roc_curve_by_group for AUROC display
 
     Features:
     - Horizontal lollipop/forest plot style
@@ -255,7 +350,48 @@ def create_forest_plot(
     - Green "safe zone" shading for acceptable range
     - Ghosting (opacity reduction) for low sample sizes
     - Direct labeling (no legend needed)
+
+    Args:
+        metrics_df: DataFrame with columns [group, metric, n, ci_lower, ci_upper].
+        metric: Metric to display (default "tpr" - OPTIONAL metric).
+        title: Chart title (auto-generated if None).
+        subtitle: Optional subtitle.
+        enable_ghosting: Whether to reduce opacity for small samples.
+        ghosting_config: Custom ghosting configuration.
+        show_safe_zone: Whether to show acceptable range shading.
+        safe_zone_min: Minimum value for safe zone (default 0.8).
+        reference_line: Optional reference line value.
+        source_note: Custom source annotation.
+        include_optional: If True, displays the plot. If False and metric is
+            OPTIONAL/CAUTION, returns placeholder. Default True for backward
+            compatibility (forest plots are commonly used for OPTIONAL metrics).
+
+    Returns:
+        Plotly Figure object.
+
+    Note:
+        Forest plots typically display OPTIONAL classification metrics.
+        For RECOMMENDED metrics, consider using specialized plots like
+        calibration curves or decision curves.
     """
+    # Check if metric should be shown based on Van Calster classification
+    if not include_optional and not _should_show_metric(metric, include_optional=False):
+        fig = go.Figure()
+        category = _get_metric_category(metric)
+        fig.add_annotation(
+            text=f"Forest plot for '{metric}' requires include_optional=True<br>"
+            f"(Van Calster classification: {category})",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["text_secondary"]),
+        )
+        fig.update_layout(
+            title=dict(text=f"<b>{title or metric.upper()}</b>", font=dict(size=TYPOGRAPHY["subheading_size"])),
+            template="faircareai",
+            height=300,
+        )
+        return fig
     ghost_cfg = ghosting_config or GHOSTING_CONFIG
 
     # Validate required columns exist
@@ -586,13 +722,55 @@ def create_metric_comparison_chart(
     metrics_df: pl.DataFrame,
     metrics: list[str] | None = None,
     title: str = "Performance Metrics by Group",
+    include_optional: bool = False,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
+    """Create grouped bar chart comparing multiple metrics across groups.
+
+    Van Calster et al. (2025) Classification:
+    - OPTIONAL: sensitivity (tpr), specificity, ppv, npv
+    - CAUTION: accuracy (not shown by default)
+
+    Args:
+        metrics_df: DataFrame with metrics data per group.
+        metrics: List of metrics to display. If None, uses defaults based on include_optional.
+        title: Chart title.
+        include_optional: If True, shows OPTIONAL metrics (tpr, fpr, ppv).
+            If False, shows only RECOMMENDED metrics (none for this chart type).
+            Default False for Governance persona compatibility.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
+
+    Returns:
+        Plotly Figure object.
+
+    Note:
+        This chart displays classification metrics which are OPTIONAL per
+        Van Calster et al. (2025). Consider using calibration plots and
+        AUROC for primary reporting.
     """
-    Create grouped bar chart comparing multiple metrics across groups.
-    """
-    # Default metrics
+    # Default metrics based on include_optional flag
     if metrics is None:
-        metrics = ["tpr", "fpr", "ppv"]
+        if include_optional:
+            # Data Scientist mode: show OPTIONAL classification metrics
+            metrics = ["tpr", "fpr", "ppv"]
+        else:
+            # Governance mode: no default metrics (this chart type is OPTIONAL)
+            # Return informative placeholder
+            fig = go.Figure()
+            fig.add_annotation(
+                text="Classification metrics require include_optional=True<br>"
+                "(Van Calster: sensitivity/specificity are OPTIONAL metrics)",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["text_secondary"]),
+            )
+            fig.update_layout(
+                title=dict(text=f"<b>{title}</b>", font=dict(size=TYPOGRAPHY["subheading_size"])),
+                template="faircareai",
+                height=300,
+            )
+            return fig
 
     # Validate required columns exist
     if "group" not in metrics_df.columns:
@@ -631,19 +809,37 @@ def create_metric_comparison_chart(
         "accuracy": GROUP_COLORS[5],
     }
 
-    metric_labels = {
-        "tpr": "Sensitivity (TPR)",
-        "fpr": "False Positive Rate",
-        "ppv": "Precision (PPV)",
-        "npv": "NPV",
-        "accuracy": "Accuracy",
-    }
+    # Persona-aware metric labels
+    def get_metric_display_label(m: str) -> str:
+        """Get persona-appropriate label for a metric."""
+        # Map internal metric names to terminology keys
+        metric_key_map = {
+            "tpr": "sensitivity",
+            "fpr": "specificity",  # FPR will use fallback
+            "ppv": "ppv",
+            "npv": "npv",
+            "accuracy": "accuracy",
+        }
+        key = metric_key_map.get(m, m)
+        label = get_label(key, persona, "name")
+        # If label is same as key, it wasn't found - use fallback
+        if label == key:
+            fallback_labels = {
+                "tpr": "Sensitivity (TPR)" if persona == OutputPersona.DATA_SCIENTIST else "Detection Rate",
+                "fpr": "False Positive Rate" if persona == OutputPersona.DATA_SCIENTIST else "False Alarm Rate",
+                "ppv": "PPV" if persona == OutputPersona.DATA_SCIENTIST else "Positive Predictive Value",
+                "npv": "NPV" if persona == OutputPersona.DATA_SCIENTIST else "Negative Predictive Value",
+                "accuracy": "Accuracy" if persona == OutputPersona.DATA_SCIENTIST else "Correct Predictions",
+            }
+            return fallback_labels.get(m, m.upper())
+        return label
 
     for metric in metrics:
         if metric in df.columns:
+            display_label = get_metric_display_label(metric)
             fig.add_trace(
                 go.Bar(
-                    name=metric_labels.get(metric, metric.upper()),
+                    name=display_label,
                     x=groups,
                     y=df[metric],
                     marker_color=metric_colors.get(metric, GROUP_COLORS[0]),
@@ -652,7 +848,7 @@ def create_metric_comparison_chart(
                     textfont=dict(size=TYPOGRAPHY["tick_size"]),
                     hovertemplate=(
                         f"<b>%{{x}}</b><br>"
-                        f"{metric_labels.get(metric, metric)}: %{{y:.1%}}<extra></extra>"
+                        f"{display_label}: %{{y:.1%}}<extra></extra>"
                     ),
                 )
             )
@@ -772,14 +968,36 @@ def create_calibration_plot(
     y_prob: np.ndarray,
     group_labels: np.ndarray | None = None,
     n_bins: int = 10,
-    title: str = "Calibration Curve",
+    title: str | None = None,
     source_note: str | None = None,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
-    """
-    Create calibration plot showing predicted vs actual probabilities.
+    """Create calibration plot showing predicted vs actual probabilities.
 
-    If group_labels provided, shows separate curves per group.
+    Van Calster et al. (2025) Classification: RECOMMENDED
+    - Calibration plots are essential for all reports
+    - Always shown regardless of include_optional setting
+
+    Args:
+        y_true: True binary outcomes (0 or 1).
+        y_prob: Predicted probabilities.
+        group_labels: Optional array of group labels for stratified curves.
+        n_bins: Number of calibration bins (default 10).
+        title: Chart title. Uses persona-appropriate default if None.
+        source_note: Custom source annotation.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
+
+    Returns:
+        Plotly Figure object.
+
+    Note:
+        This is a RECOMMENDED metric per Van Calster et al. (2025).
+        If group_labels provided, shows separate curves per group.
     """
+    # Get persona-appropriate labels
+    if title is None:
+        title = get_label("calibration", persona, "name")
+    x_label, y_label = get_axis_labels("calibration", persona)
     fig = go.Figure()
 
     # Perfect calibration line
@@ -863,21 +1081,32 @@ def create_calibration_plot(
     # Generate alt text for WCAG 2.1 AA compliance
     alt_text = generate_calibration_alt_text(y_true, y_prob, group_labels, title)
 
+    # Persona-appropriate subtitle
+    subtitle = (
+        "Closer to diagonal = better calibrated"
+        if persona == OutputPersona.DATA_SCIENTIST
+        else "Points on the line mean predictions match reality"
+    )
+
     fig.update_layout(
         title=dict(
-            text=f"<b>{title}</b><br><span style='font-size:{TYPOGRAPHY['body_size']}px;color:#666'>Closer to diagonal = better calibrated</span>",
+            text=f"<b>{title}</b><br><span style='font-size:{TYPOGRAPHY['body_size']}px;color:#666'>{subtitle}</span>",
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["subheading_size"]),
         ),
         xaxis=dict(
             title=dict(
-                text="Mean Predicted Probability", font=dict(size=TYPOGRAPHY["axis_title_size"])
+                text=x_label or "Mean Predicted Probability",
+                font=dict(size=TYPOGRAPHY["axis_title_size"]),
             ),
             tickformat=".0%",
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
             range=[0, 1],
         ),
         yaxis=dict(
-            title=dict(text="Fraction of Positives", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=y_label or "Fraction of Positives",
+                font=dict(size=TYPOGRAPHY["axis_title_size"]),
+            ),
             tickformat=".0%",
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
             range=[0, 1],
@@ -897,12 +1126,36 @@ def create_roc_curve_by_group(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     group_labels: np.ndarray,
-    title: str = "ROC Curves by Demographic Group",
+    title: str | None = None,
     source_note: str | None = None,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
+    """Create ROC curves for each demographic group.
+
+    Van Calster et al. (2025) Classification: RECOMMENDED
+    - AUROC is the key discrimination measure
+    - Always shown regardless of include_optional setting
+
+    Args:
+        y_true: True binary outcomes (0 or 1).
+        y_prob: Predicted probabilities.
+        group_labels: Array of group labels for stratified curves.
+        title: Chart title. Uses persona-appropriate default if None.
+        source_note: Custom source annotation.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
+
+    Returns:
+        Plotly Figure object with ROC curves per group.
+
+    Note:
+        This is a RECOMMENDED metric per Van Calster et al. (2025).
+        Each curve shows AUC in the legend for easy comparison.
     """
-    Create ROC curves for each demographic group.
-    """
+    # Get persona-appropriate labels
+    if title is None:
+        base_title = get_label("auroc", persona, "name")
+        title = f"{base_title} by Demographic Group"
+    x_label, y_label = get_axis_labels("auroc", persona)
     fig = go.Figure()
 
     # Diagonal reference line
@@ -954,13 +1207,19 @@ def create_roc_curve_by_group(
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["subheading_size"]),
         ),
         xaxis=dict(
-            title=dict(text="False Positive Rate", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=x_label or "False Positive Rate",
+                font=dict(size=TYPOGRAPHY["axis_title_size"]),
+            ),
             tickformat=".0%",
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
             range=[0, 1],
         ),
         yaxis=dict(
-            title=dict(text="True Positive Rate", font=dict(size=TYPOGRAPHY["axis_title_size"])),
+            title=dict(
+                text=y_label or "True Positive Rate",
+                font=dict(size=TYPOGRAPHY["axis_title_size"]),
+            ),
             tickformat=".0%",
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
             range=[0, 1],
@@ -1037,7 +1296,7 @@ def create_sample_size_waterfall(
 
     fig.update_layout(
         title=dict(
-            text=f"<b>{title}</b><br><span style='font-size:12px;color:#666'>Groups below threshold lines have reduced visual weight</span>",
+            text=f"<b>{title}</b><br><span style='font-size:14px;color:#666'>Groups below threshold lines have reduced visual weight</span>",
             font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["subheading_size"]),
         ),
         xaxis=dict(
@@ -1061,16 +1320,53 @@ def create_equity_dashboard(
     metrics_df: pl.DataFrame,
     disparity_df: pl.DataFrame | None = None,
     metric: str = "tpr",
+    include_optional: bool = False,
 ) -> go.Figure:
-    """
-    Create comprehensive equity dashboard with multiple views.
+    """Create comprehensive equity dashboard with multiple views.
+
+    Van Calster et al. (2025) Classification:
+    - This dashboard displays OPTIONAL metrics (sensitivity, PPV, etc.)
+    - Requires include_optional=True for full display
+    - Default mode shows sample sizes and basic structure only
 
     Layout (per CHAI spec):
     - Top left: Subgroup performance (forest plot)
     - Top right: Sample size distribution
     - Bottom left: Fairness metrics radar
     - Bottom right: Disparity from reference
+
+    Args:
+        metrics_df: DataFrame with metrics data per group.
+        disparity_df: Optional DataFrame with disparity calculations.
+        metric: Primary metric to display (default "tpr").
+        include_optional: If True, shows full dashboard with OPTIONAL metrics.
+            If False, shows reduced dashboard with sample size info only.
+            Default False for Governance persona compatibility.
+
+    Returns:
+        Plotly Figure object.
     """
+    if not include_optional:
+        # Governance mode: show informative placeholder
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Equity dashboard requires include_optional=True<br>"
+            "(Contains OPTIONAL metrics: TPR, FPR, PPV per Van Calster et al. 2025)",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["text_secondary"]),
+        )
+        fig.update_layout(
+            title=dict(
+                text="<b>Equity Audit Dashboard</b><br>"
+                "<span style='font-size:12px;color:#666'>Enable include_optional=True for full view</span>",
+                font=dict(family=TYPOGRAPHY["heading_font"], size=TYPOGRAPHY["heading_size"]),
+            ),
+            template="faircareai",
+            height=400,
+        )
+        return fig
     fig = make_subplots(
         rows=2,
         cols=2,
@@ -1233,14 +1529,46 @@ def create_subgroup_heatmap(
     metrics_df: pl.DataFrame,
     metric: str = "tpr",
     title: str | None = None,
+    include_optional: bool = True,
 ) -> go.Figure:
-    """
-    Create heatmap of metric across all subgroups.
+    """Create heatmap of metric across all subgroups.
 
-    Per CHAI spec - shows metric values with color intensity.
+    Van Calster et al. (2025) Classification:
+    - Default metric (tpr) is OPTIONAL
+    - Shows metric values with color intensity per CHAI spec
+
+    Args:
+        metrics_df: DataFrame with columns [group, attribute, metric].
+        metric: Metric to display (default "tpr" - OPTIONAL metric).
+        title: Chart title (auto-generated if None).
+        include_optional: If True, displays the heatmap. If False and metric is
+            OPTIONAL/CAUTION, returns placeholder. Default True for backward
+            compatibility.
+
+    Returns:
+        Plotly Figure object.
     """
     if title is None:
         title = f"Subgroup {metric.upper()} Heatmap"
+
+    # Check if metric should be shown based on Van Calster classification
+    if not include_optional and not _should_show_metric(metric, include_optional=False):
+        fig = go.Figure()
+        category = _get_metric_category(metric)
+        fig.add_annotation(
+            text=f"Subgroup heatmap for '{metric}' requires include_optional=True<br>"
+            f"(Van Calster classification: {category})",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["text_secondary"]),
+        )
+        fig.update_layout(
+            title=dict(text=f"<b>{title}</b>", font=dict(size=TYPOGRAPHY["subheading_size"])),
+            template="faircareai",
+            height=300,
+        )
+        return fig
 
     # Validate required columns exist
     required_cols = ["group", "attribute", metric]
@@ -1284,9 +1612,9 @@ def create_subgroup_heatmap(
     attributes = df["attribute"].unique().tolist()
 
     # Build matrix data
-    z_data = []
-    y_labels = []
-    x_labels = []
+    z_data: list[list[float]] = []
+    y_labels: list[str] = []
+    x_labels: list[str] = []
 
     for attr in attributes:
         attr_df = df[df["attribute"] == attr]
@@ -1357,18 +1685,61 @@ def create_subgroup_heatmap(
 def create_fairness_radar(
     metrics_df: pl.DataFrame,
     title: str = "Fairness Metrics by Group",
+    include_optional: bool = False,
+    persona: OutputPersona = OutputPersona.DATA_SCIENTIST,
 ) -> go.Figure:
-    """
-    Create radar/spider chart showing multiple fairness metrics per group.
+    """Create radar/spider chart showing multiple fairness metrics per group.
 
-    Per CHAI spec visualization requirements.
+    Van Calster et al. (2025) Classification:
+    - OPTIONAL: sensitivity (tpr), specificity, ppv, npv
+    - CAUTION: accuracy (only shown if explicitly requested)
+
+    Args:
+        metrics_df: DataFrame with metrics data per group.
+        title: Chart title.
+        include_optional: If True, shows OPTIONAL metrics (tpr, fpr, ppv, npv).
+            If False, returns placeholder indicating no RECOMMENDED metrics available.
+            Default False for Governance persona compatibility.
+        persona: OutputPersona for label terminology (default DATA_SCIENTIST).
+
+    Returns:
+        Plotly Figure object.
+
+    Note:
+        This chart displays classification metrics which are OPTIONAL per
+        Van Calster et al. (2025). Consider using calibration plots and
+        AUROC for primary reporting.
     """
+    if not include_optional:
+        # Governance mode: radar chart shows OPTIONAL/CAUTION metrics only
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Fairness radar requires include_optional=True<br>"
+            "(Van Calster: TPR/FPR/PPV/NPV are OPTIONAL metrics)",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["text_secondary"]),
+        )
+        fig.update_layout(
+            title=dict(text=f"<b>{title}</b>", font=dict(size=TYPOGRAPHY["subheading_size"])),
+            template="faircareai",
+            height=300,
+        )
+        return fig
+
     df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
 
     fig = go.Figure()
 
-    metrics = ["tpr", "fpr", "ppv", "npv", "accuracy"]
-    metric_labels = ["TPR", "FPR", "PPV", "NPV", "Accuracy"]
+    # OPTIONAL metrics only (exclude CAUTION metrics like accuracy by default)
+    metrics = ["tpr", "fpr", "ppv", "npv"]
+
+    # Persona-aware metric labels
+    if persona == OutputPersona.GOVERNANCE:
+        metric_labels = ["Detection Rate", "False Alarm Rate", "Positive Predictive Value", "Negative Predictive Value"]
+    else:
+        metric_labels = ["Sensitivity", "FPR", "PPV", "NPV"]
 
     # Filter to available metrics
     available = [m for m in metrics if m in df.columns]

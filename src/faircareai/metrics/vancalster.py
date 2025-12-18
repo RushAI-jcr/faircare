@@ -1,13 +1,31 @@
 """
 FairCareAI Van Calster Performance Metrics Module
 
-Implements the four key performance measures from Van Calster et al. (2025)
+Implements the four RECOMMENDED performance measures from Van Calster et al. (2025)
 for evaluating predictive AI models, computed both overall and by subgroup:
 
-1. AUROC by subgroup: Discrimination measure
-2. Calibration by subgroup: Detecting differential miscalibration
-3. Net Benefit by subgroup: Clinical utility across groups
-4. Risk Distribution by subgroup: Probability distributions by outcome
+1. AUROC by subgroup: Discrimination measure [RECOMMENDED]
+2. Calibration by subgroup: Detecting differential miscalibration [RECOMMENDED]
+3. Net Benefit by subgroup: Clinical utility across groups [RECOMMENDED]
+4. Risk Distribution by subgroup: Probability distributions by outcome [RECOMMENDED]
+
+Van Calster et al. (2025) Metric Classification:
+-------------------------------------------------
+This module implements the RECOMMENDED metrics (Table 2):
+  - AUROC: "The key discrimination measure" - essential for all reports
+  - Calibration plot: "Most insightful approach to assess calibration"
+  - Net Benefit with DCA: "Essential to report for clinical utility"
+  - Risk Distribution plots: "Provide valuable insights"
+
+Supporting OPTIONAL metrics included:
+  - O:E ratio: Interpretable but partial view of calibration
+  - Calibration slope/intercept: Hard to interpret but acceptable
+  - Brier score, Scaled Brier Score: Strictly proper, useful
+  - ICI, ECI: Summarize calibration but conceal direction
+
+Van Calster et al. (2025) Table 2 warns against:
+  - F1 score: ONLY metric violating BOTH properness AND clear focus
+  - Classification summaries (Accuracy, MCC, Kappa, DOR): Improper measures
 
 Methodology Reference:
     Van Calster B, Collins GS, Vickers AJ, et al. Evaluation of performance
@@ -28,6 +46,7 @@ from scipy import stats
 from sklearn.calibration import calibration_curve
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, roc_auc_score
+from statsmodels.api import Logit
 
 from faircareai.core.constants import (
     DEFAULT_BOOTSTRAP_SEED,
@@ -299,24 +318,42 @@ def _compute_calibration_metrics(
         return result
 
     # Brier score (strictly proper per Van Calster)
-    result["brier_score"] = float(brier_score_loss(y_true, y_prob))
+    brier = brier_score_loss(y_true, y_prob)
+    result["brier_score"] = float(brier)
+
+    # Scaled Brier Score (BSS) per Van Calster et al.
+    # BSS = 1 - (Brier / Brier_null), where Brier_null = prevalence * (1 - prevalence)
+    prevalence = np.mean(y_true)
+    brier_null = prevalence * (1 - prevalence)
+    result["brier_scaled"] = float(1 - (brier / brier_null)) if brier_null > 0 else 0.0
 
     # O:E ratio (Observed/Expected)
     expected = np.sum(y_prob)
     observed = np.sum(y_true)
     result["oe_ratio"] = float(observed / expected) if expected > 0 else None
 
-    # Calibration slope and intercept via logistic regression on logit(p)
+    # Calibration intercept and slope per Van Calster et al. methodology
+    # Intercept: fit logistic model with logit(p) as OFFSET (coefficient fixed at 1)
+    # Slope: fit logistic regression with logit(p) as predictor
     try:
         y_prob_clipped = np.clip(y_prob, PROB_CLIP_MIN, PROB_CLIP_MAX)
-        log_odds = np.log(y_prob_clipped / (1 - y_prob_clipped)).reshape(-1, 1)
+        logit_p = np.log(y_prob_clipped / (1 - y_prob_clipped))
 
-        # Fit logistic regression: outcome ~ logit(predicted)
-        lr = LogisticRegression(solver="lbfgs", max_iter=1000)
-        lr.fit(log_odds, y_true)
+        # Calibration INTERCEPT using statsmodels Logit with offset
+        # This is the Van Calster method: logit(Y) = α + offset(logit_p)
+        try:
+            int_model = Logit(y_true, np.ones_like(y_true), offset=logit_p).fit(disp=0)
+            result["calibration_intercept"] = float(int_model.params.iloc[0])
+        except Exception:
+            # Fallback to sklearn method if statsmodels fails
+            lr_int = LogisticRegression(solver="lbfgs", max_iter=1000)
+            lr_int.fit(logit_p.reshape(-1, 1), y_true)
+            result["calibration_intercept"] = float(lr_int.intercept_[0])
 
-        result["calibration_intercept"] = float(lr.intercept_[0])
-        result["calibration_slope"] = float(lr.coef_[0, 0])
+        # Calibration SLOPE using sklearn LogisticRegression
+        lr_slope = LogisticRegression(solver="lbfgs", max_iter=1000)
+        lr_slope.fit(logit_p.reshape(-1, 1), y_true)
+        result["calibration_slope"] = float(lr_slope.coef_[0, 0])
     except Exception as e:
         logger.warning("Calibration slope computation failed: %s", str(e))
         result["calibration_intercept"] = None
@@ -331,14 +368,22 @@ def _compute_calibration_metrics(
             "n_bins": n_bins,
         }
 
-        # ICI (Integrated Calibration Index)
+        # ICI (Integrated Calibration Index) - average absolute calibration error
         result["ici"] = float(np.mean(np.abs(prob_pred - prob_true)))
+
+        # ECI (E-statistic Calibration Index) - squared calibration error normalized
+        # Per Van Calster: mean((smoothed_observed - predicted)^2) / mean((prevalence - predicted)^2)
+        eci_numer = np.mean((prob_true - prob_pred) ** 2)
+        eci_denom = np.mean((prevalence - prob_pred) ** 2)
+        result["eci"] = float(eci_numer / eci_denom) if eci_denom > 0 else 0.0
+
         # E_max (Maximum Calibration Error)
         result["e_max"] = float(np.max(np.abs(prob_pred - prob_true)))
     except ValueError as e:
         logger.warning("Calibration curve failed: %s", str(e))
         result["calibration_curve"] = None
         result["ici"] = None
+        result["eci"] = None
         result["e_max"] = None
 
     # Interpretation

@@ -292,6 +292,176 @@ GHOSTING_CONFIG = GhostingConfig()
 
 
 # =============================================================================
+# VAN CALSTER METRIC VISUAL INDICATORS
+# =============================================================================
+# Visual styling for metric classification per Van Calster et al. (2025)
+
+METRIC_CATEGORY_COLORS = {
+    "RECOMMENDED": {
+        "bg": "#E8F5E9",  # Light green background
+        "border": "#4CAF50",  # Green border
+        "text": "#1B5E20",  # Dark green text
+        "badge": "✓ RECOMMENDED",
+    },
+    "OPTIONAL": {
+        "bg": "#FFF8E1",  # Light amber background
+        "border": "#FFC107",  # Amber border
+        "text": "#6D4C41",  # Brown text
+        "badge": "○ OPTIONAL",
+    },
+    "CAUTION": {
+        "bg": "#FFEBEE",  # Light red background
+        "border": "#F44336",  # Red border
+        "text": "#B71C1C",  # Dark red text
+        "badge": "⚠ CAUTION",
+    },
+    "UNKNOWN": {
+        "bg": "#F5F5F5",  # Light gray background
+        "border": "#9E9E9E",  # Gray border
+        "text": "#424242",  # Dark gray text
+        "badge": "? UNCLASSIFIED",
+    },
+}
+
+METRIC_CATEGORY_CSS = """
+/* Van Calster Metric Classification Styles */
+.metric-recommended {
+    background: #E8F5E9;
+    border-left: 4px solid #4CAF50;
+    padding: 12px 16px;
+    margin: 8px 0;
+}
+
+.metric-optional {
+    background: #FFF8E1;
+    border-left: 4px solid #FFC107;
+    padding: 12px 16px;
+    margin: 8px 0;
+    opacity: 0.9;
+}
+
+.metric-caution {
+    background: #FFEBEE;
+    border-left: 4px solid #F44336;
+    padding: 12px 16px;
+    margin: 8px 0;
+    opacity: 0.85;
+}
+
+.metric-badge-recommended {
+    display: inline-block;
+    background: #4CAF50;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-badge-optional {
+    display: inline-block;
+    background: #FFC107;
+    color: #6D4C41;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-badge-caution {
+    display: inline-block;
+    background: #F44336;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.optional-section {
+    border: 1px dashed #FFC107;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    background: #FFFBF0;
+}
+
+.optional-section-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #F57C00;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.caution-warning {
+    background: #FFF3E0;
+    border: 1px solid #FF9800;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 13px;
+    color: #E65100;
+}
+
+.caution-warning::before {
+    content: "⚠️ ";
+}
+"""
+
+
+def get_metric_category_style(category: str) -> dict:
+    """Get visual styling for a Van Calster metric category.
+
+    Args:
+        category: One of "RECOMMENDED", "OPTIONAL", "CAUTION", "UNKNOWN".
+
+    Returns:
+        Dict with 'bg', 'border', 'text', 'badge' styling values.
+    """
+    return METRIC_CATEGORY_COLORS.get(category, METRIC_CATEGORY_COLORS["UNKNOWN"])
+
+
+def render_metric_badge_html(category: str) -> str:
+    """Render an HTML badge for a metric category.
+
+    Args:
+        category: One of "RECOMMENDED", "OPTIONAL", "CAUTION".
+
+    Returns:
+        HTML string for the badge.
+    """
+    style = get_metric_category_style(category)
+    css_class = f"metric-badge-{category.lower()}"
+    return f'<span class="{css_class}">{style["badge"]}</span>'
+
+
+def render_optional_section_html(content: str, title: str = "OPTIONAL Metrics") -> str:
+    """Wrap content in an OPTIONAL section with visual indicator.
+
+    Args:
+        content: HTML content to wrap.
+        title: Section title.
+
+    Returns:
+        HTML string with optional section styling.
+    """
+    return f"""
+    <div class="optional-section">
+        <div class="optional-section-header">{title}</div>
+        {content}
+    </div>
+    """
+
+
+# =============================================================================
 # CHART HEIGHT CALCULATION - Standardized dynamic heights
 # =============================================================================
 def calculate_chart_height(n_items: int, chart_type: str = "default") -> int:

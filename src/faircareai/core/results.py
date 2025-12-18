@@ -11,11 +11,14 @@ organizational values, and governance frameworks.
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from faircareai.core.config import FairnessConfig
+if TYPE_CHECKING:
+    import plotly.graph_objects as go
+
+from faircareai.core.config import FairnessConfig, MetricDisplayConfig, OutputPersona
 from faircareai.core.logging import get_logger
 from faircareai.visualization.themes import GOVERNANCE_DISCLAIMER_SHORT
 
@@ -201,7 +204,7 @@ class AuditResults:
 
         return plot_calibration_curve(self)
 
-    def plot_threshold_analysis(self, selected_threshold: float | None = None):
+    def plot_threshold_analysis(self, selected_threshold: float | None = None) -> "go.Figure":
         """Interactive threshold sensitivity analysis (TRIPOD+AI 2.4).
 
         Data scientist can TOGGLE threshold to see metric impacts.
@@ -227,7 +230,7 @@ class AuditResults:
 
         return plot_decision_curve(self)
 
-    def plot_calibration(self, by: str | None = None):
+    def plot_calibration(self, by: str | None = None) -> "go.Figure":
         """Plot calibration curve(s).
 
         Args:
@@ -261,7 +264,7 @@ class AuditResults:
 
         return create_fairness_dashboard(self)
 
-    def plot_subgroup_performance(self, metric: str = "auroc"):
+    def plot_subgroup_performance(self, metric: str = "auroc") -> "go.Figure":
         """Plot subgroup performance comparison.
 
         Args:
@@ -308,20 +311,57 @@ class AuditResults:
 
     # === Export Methods ===
 
-    def to_html(self, path: str | Path, open_browser: bool = False) -> Path:
+    def to_html(
+        self,
+        path: str | Path,
+        open_browser: bool = False,
+        persona: OutputPersona | str = OutputPersona.DATA_SCIENTIST,
+        include_optional: bool = False,
+    ) -> Path:
         """Export interactive HTML report.
+
+        Van Calster et al. (2025) Metric Display:
+        -----------------------------------------
+        By default, reports show only RECOMMENDED metrics (AUROC, calibration plot,
+        net benefit, risk distribution). Set include_optional=True to also show
+        OPTIONAL metrics (Brier score, O:E ratio, sensitivity+specificity, PPV+NPV).
 
         Args:
             path: Output file path.
             open_browser: Open report in browser after generation.
+            persona: Output persona - 'data_scientist' for full technical output
+                (default), 'governance' for streamlined 3-5 page summary.
+            include_optional: If True, include Van Calster OPTIONAL metrics in
+                data scientist reports. Ignored for governance persona.
 
         Returns:
             Path to generated report.
+
+        Example:
+            # Full report with RECOMMENDED metrics only (new default)
+            results.to_html("report.html")
+
+            # Full report with RECOMMENDED + OPTIONAL metrics
+            results.to_html("report.html", include_optional=True)
+
+            # Streamlined governance report (RECOMMENDED only, always)
+            results.to_html("governance.html", persona="governance")
         """
-        from faircareai.reports.generator import generate_html_report
+        from faircareai.reports.generator import (
+            generate_governance_html_report,
+            generate_html_report,
+        )
 
         path = Path(path)
-        generate_html_report(self, path)
+        persona = _normalize_persona(persona)
+
+        # Create metric display config based on persona and options
+        if persona == OutputPersona.GOVERNANCE:
+            metric_config = MetricDisplayConfig.governance()
+            generate_governance_html_report(self, path, metric_config=metric_config)
+        else:
+            metric_config = MetricDisplayConfig.data_scientist(include_optional=include_optional)
+            generate_html_report(self, path, metric_config=metric_config)
 
         if open_browser:
             import webbrowser
@@ -330,8 +370,109 @@ class AuditResults:
 
         return path
 
-    def to_pdf(self, path: str | Path) -> Path:
-        """Export PDF report for governance review.
+    def to_pdf(
+        self,
+        path: str | Path,
+        persona: OutputPersona | str = OutputPersona.DATA_SCIENTIST,
+        include_optional: bool = False,
+    ) -> Path:
+        """Export PDF report.
+
+        Van Calster et al. (2025) Metric Display:
+        -----------------------------------------
+        By default, reports show only RECOMMENDED metrics (AUROC, calibration plot,
+        net benefit, risk distribution). Set include_optional=True to also show
+        OPTIONAL metrics (Brier score, O:E ratio, sensitivity+specificity, PPV+NPV).
+
+        Args:
+            path: Output file path.
+            persona: Output persona - 'data_scientist' for full technical output
+                (default), 'governance' for streamlined 3-5 page summary.
+            include_optional: If True, include Van Calster OPTIONAL metrics in
+                data scientist reports. Ignored for governance persona.
+
+        Returns:
+            Path to generated report.
+
+        Example:
+            # Full report with RECOMMENDED metrics only (new default)
+            results.to_pdf("report.pdf")
+
+            # Full report with RECOMMENDED + OPTIONAL metrics
+            results.to_pdf("report.pdf", include_optional=True)
+
+            # Streamlined governance report (RECOMMENDED only, always)
+            results.to_pdf("governance.pdf", persona="governance")
+        """
+        from faircareai.reports.generator import (
+            generate_governance_pdf_report,
+            generate_pdf_report,
+        )
+
+        path = Path(path)
+        persona = _normalize_persona(persona)
+
+        # Create metric display config based on persona and options
+        if persona == OutputPersona.GOVERNANCE:
+            metric_config = MetricDisplayConfig.governance()
+            return generate_governance_pdf_report(self, path, metric_config=metric_config)
+        else:
+            metric_config = MetricDisplayConfig.data_scientist(include_optional=include_optional)
+            # Convert AuditResults to AuditSummary for generator
+            summary = self._to_audit_summary()
+            return generate_pdf_report(summary, path, metric_config=metric_config)
+
+    def to_pptx(
+        self,
+        path: str | Path,
+        persona: OutputPersona | str = OutputPersona.DATA_SCIENTIST,  # noqa: ARG002
+    ) -> Path:
+        """Export PowerPoint deck for governance review.
+
+        Creates a presentation suitable for board meetings and
+        governance committee presentations.
+
+        Note:
+            The persona parameter is accepted for API consistency but currently
+            has no effect - PPTX output is already governance-focused.
+
+        Args:
+            path: Output file path.
+            persona: Output persona (currently unused - PPTX is governance-focused).
+
+        Returns:
+            Path to generated presentation.
+
+        Example:
+            results.to_pptx("report.pptx")
+        """
+        from faircareai.reports.generator import generate_pptx_report
+
+        path = Path(path)
+        # PPTX is already governance-focused, use same generator for all personas
+        summary = self._to_audit_summary()
+        return generate_pptx_report(summary, path)
+
+    # === Convenience Methods for Governance Persona ===
+
+    def to_governance_html(self, path: str | Path, open_browser: bool = False) -> Path:
+        """Export streamlined HTML report for governance committees.
+
+        Shorthand for: results.to_html(path, persona='governance')
+
+        Args:
+            path: Output file path.
+            open_browser: Open report in browser after generation.
+
+        Returns:
+            Path to generated report.
+        """
+        return self.to_html(path, open_browser=open_browser, persona=OutputPersona.GOVERNANCE)
+
+    def to_governance_pdf(self, path: str | Path) -> Path:
+        """Export streamlined PDF report for governance committees.
+
+        Shorthand for: results.to_pdf(path, persona='governance')
 
         Args:
             path: Output file path.
@@ -339,30 +480,7 @@ class AuditResults:
         Returns:
             Path to generated report.
         """
-        from faircareai.reports.generator import generate_pdf_report
-
-        path = Path(path)
-        # Convert AuditResults to AuditSummary for generator
-        summary = self._to_audit_summary()
-        return generate_pdf_report(summary, path)
-
-    def to_pptx(self, path: str | Path) -> Path:
-        """Export PowerPoint deck for governance review.
-
-        Creates a presentation suitable for board meetings and
-        governance committee presentations.
-
-        Args:
-            path: Output file path.
-
-        Returns:
-            Path to generated presentation.
-        """
-        from faircareai.reports.generator import generate_pptx_report
-
-        path = Path(path)
-        summary = self._to_audit_summary()
-        return generate_pptx_report(summary, path)
+        return self.to_pdf(path, persona=OutputPersona.GOVERNANCE)
 
     def to_json(self, path: str | Path) -> Path:
         """Export metrics as JSON for programmatic use.
@@ -456,6 +574,32 @@ class AuditResults:
             metrics_df=pl.DataFrame(),  # Would need to reconstruct
             disparities_df=pl.DataFrame(),  # Would need to reconstruct
         )
+
+
+def _normalize_persona(persona: OutputPersona | str) -> OutputPersona:
+    """Normalize persona parameter to OutputPersona enum.
+
+    Args:
+        persona: Persona as enum or string.
+
+    Returns:
+        OutputPersona enum value.
+
+    Raises:
+        ValueError: If persona string is not recognized.
+    """
+    if isinstance(persona, OutputPersona):
+        return persona
+    if isinstance(persona, str):
+        persona_lower = persona.lower().replace("-", "_")
+        if persona_lower in ("data_scientist", "datascientist", "full", "technical"):
+            return OutputPersona.DATA_SCIENTIST
+        if persona_lower in ("governance", "executive", "summary", "streamlined"):
+            return OutputPersona.GOVERNANCE
+        raise ValueError(
+            f"Unknown persona '{persona}'. Use 'data_scientist' or 'governance'."
+        )
+    raise TypeError(f"persona must be OutputPersona or str, got {type(persona)}")
 
 
 def _make_json_serializable(obj):

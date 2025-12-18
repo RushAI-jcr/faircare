@@ -68,6 +68,72 @@ results.to_html("report.html")
 
 ---
 
+## Output Personas
+
+FairCareAI supports two output personas tailored for different audiences:
+
+### Data Scientist Persona (Default)
+
+Full technical reports for model validation teams (15-20+ pages).
+
+**Includes:**
+- Complete statistical methodology
+- Bootstrap confidence intervals
+- All fairness metrics with CIs
+- Technical visualizations (ROC, PR curves, DCA)
+- Detailed subgroup analysis
+- Raw data tables
+
+**Usage:**
+```python
+# Default - full technical output
+results.to_html("report.html")
+results.to_pdf("report.pdf")
+
+# Explicit persona parameter
+results.to_html("report.html", persona="data_scientist")
+```
+
+### Governance Persona
+
+Streamlined 3-5 page reports for governance committees and clinical leadership.
+
+**Includes:**
+- Executive summary with traffic light status
+- 4 key performance figures (Van Calster methodology)
+- 4 subgroup fairness figures per attribute
+- Plain language explanations on every figure
+- Go/No-Go checklist
+- Advisory disclaimer banner
+
+**Usage:**
+```python
+# Governance-focused output
+results.to_html("gov_report.html", persona="governance")
+results.to_pdf("gov_report.pdf", persona="governance")
+
+# Convenience shortcuts
+results.to_governance_html("gov_report.html")
+results.to_governance_pdf("gov_report.pdf")
+
+# PowerPoint (always governance-focused)
+results.to_pptx("presentation.pptx")
+```
+
+### Comparison
+
+| Feature | Data Scientist | Governance |
+|---------|---------------|------------|
+| Page count | 15-20+ | 3-5 |
+| Technical detail | Full | Simplified |
+| Confidence intervals | All metrics | Key metrics only |
+| Plain language | Minimal | Extensive |
+| Figure explanations | Technical | Plain language |
+| Decision support | Raw metrics | Traffic light status |
+| Use case | Model validation | Committee review |
+
+---
+
 ## Python API Reference
 
 ### FairCareAudit
@@ -474,18 +540,43 @@ Checklist-style scorecard for governance.
 ##### to_html()
 
 ```python
-to_html(path: str | Path, open_browser: bool = False) -> Path
+to_html(
+    path: str | Path,
+    open_browser: bool = False,
+    persona: str = "data_scientist"
+) -> Path
 ```
 
 Export interactive HTML report.
 
+**Parameters:**
+- `path`: Output file path
+- `open_browser`: Open in browser after export
+- `persona`: "data_scientist" (default) or "governance"
+
+##### to_governance_html()
+
+```python
+to_governance_html(path: str | Path, open_browser: bool = False) -> Path
+```
+
+Convenience method for governance HTML export.
+
 ##### to_pdf()
 
 ```python
-to_pdf(path: str | Path) -> Path
+to_pdf(path: str | Path, persona: str = "data_scientist") -> Path
 ```
 
 Export PDF report (requires `[export]`).
+
+##### to_governance_pdf()
+
+```python
+to_governance_pdf(path: str | Path) -> Path
+```
+
+Convenience method for governance PDF export.
 
 ##### to_pptx()
 
@@ -493,7 +584,7 @@ Export PDF report (requires `[export]`).
 to_pptx(path: str | Path) -> Path
 ```
 
-Export PowerPoint deck (requires `[export]`).
+Export PowerPoint deck (requires `[export]`). Always uses governance persona.
 
 ##### to_json()
 
