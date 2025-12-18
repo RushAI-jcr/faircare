@@ -38,7 +38,7 @@ FairCareAI is a Python package for auditing machine learning models for fairness
 - **Van Calster et al. (2025) Methodology**: 4 recommended fairness visualizations (AUROC, Calibration, Sensitivity/TPR, Selection Rate)
 - **CHAI RAIC Framework**: Aligned with Coalition for Health AI governance standards
 - **Plain Language Explanations**: Every visualization includes clear explanations of axes, metrics, and clinical significance
-- **Publication-Ready Typography**: Minimum 14px fonts, JAMA-compliant styling
+- **Publication-Ready Typography**: Minimum 14px fonts
 - **Accessibility-First Design**: WCAG 2.1 AA compliant, colorblind-safe palettes
 - **Multiple Export Formats**: HTML dashboards, PDF reports, PowerPoint decks
 - **HIPAA-Friendly**: All computation runs locally, no cloud dependencies
