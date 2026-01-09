@@ -151,22 +151,22 @@ OKABE_ITO = {
     "black": "#000000",
 }
 
-# Editorial + Notion-Inspired Color Extensions
+# Publication Color Extensions
 # Updated: Pure white backgrounds for professional aesthetic
 EDITORIAL_COLORS = {
     # Professional White Backgrounds
-    "newsprint": "#FFFFFF",  # Pure white for plots (was #FAFAF8)
+    "newsprint": "#FFFFFF",  # Pure white for plots
     "cream": "#FAFAFA",  # Very subtle off-white for content areas
-    # Notion-Inspired Neutrals
-    "soft_black": "#191919",  # Notion dark mode background
-    "charcoal": "#37352F",  # Notion default text
-    "slate": "#6B6B6B",  # Notion secondary text
-    "silver": "#9B9A97",  # Notion tertiary text
+    # Professional Neutrals
+    "soft_black": "#191919",  # Dark mode background
+    "charcoal": "#37352F",  # Default text
+    "slate": "#6B6B6B",  # Secondary text
+    "silver": "#9B9A97",  # Tertiary text
     # Accent & Utility
     "safe_zone": "#E8F5E9",
     "safe_zone_border": "#A5D6A7",
-    "reference_gray": "#787774",  # Notion reference gray
-    "divider": "#E3E2E0",  # Notion divider
+    "reference_gray": "#787774",  # Reference gray
+    "divider": "#E3E2E0",  # Divider line
     "highlight": "#FFF8E6",  # Warm highlight yellow
 }
 
