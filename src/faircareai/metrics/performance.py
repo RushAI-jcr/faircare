@@ -33,19 +33,6 @@ See constants.py for VANCALSTER_* classification constants.
 from typing import Any
 
 import numpy as np
-
-from faircareai.core.bootstrap import (
-    bootstrap_confusion_metrics,
-    bootstrap_metric,
-    compute_percentile_ci,
-)
-from faircareai.core.types import (
-    CalibrationMetrics,
-    ClassificationMetrics,
-    DiscriminationMetrics,
-    OverallPerformance,
-)
-from faircareai.core.validation import safe_divide
 import polars as pl
 from sklearn.calibration import calibration_curve
 from sklearn.linear_model import LogisticRegression
@@ -60,6 +47,11 @@ from sklearn.metrics import (
 )
 from statsmodels.api import Logit
 
+from faircareai.core.bootstrap import (
+    bootstrap_confusion_metrics,
+    bootstrap_metric,
+    compute_percentile_ci,
+)
 from faircareai.core.constants import (
     BRIER_POOR_THRESHOLD,
     CALIBRATION_SLOPE_OVERFITTING,
@@ -68,6 +60,13 @@ from faircareai.core.constants import (
     PROB_CLIP_MIN,
 )
 from faircareai.core.logging import get_logger
+from faircareai.core.types import (
+    CalibrationMetrics,
+    ClassificationMetrics,
+    DiscriminationMetrics,
+    OverallPerformance,
+)
+from faircareai.core.validation import safe_divide
 
 logger = get_logger(__name__)
 

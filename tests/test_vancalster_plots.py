@@ -15,8 +15,8 @@ import numpy as np
 from plotly.graph_objects import Figure
 
 from faircareai.visualization.themes import FAIRCAREAI_BRAND
+from faircareai.visualization.utils import add_source_annotation
 from faircareai.visualization.vancalster_plots import (
-    _add_source_annotation,
     _generate_auroc_forest_alt_text,
     _generate_calibration_alt_text,
     _generate_decision_curve_alt_text,
@@ -189,14 +189,14 @@ class TestGenerateRiskDistributionAltText:
 
 
 class TestAddSourceAnnotation:
-    """Tests for _add_source_annotation function."""
+    """Tests for add_source_annotation function."""
 
     def test_adds_annotation(self) -> None:
         """Test that annotation is added to figure."""
         import plotly.graph_objects as go
 
         fig = go.Figure()
-        result = _add_source_annotation(fig)
+        result = add_source_annotation(fig)
         assert result is fig
         # Check annotation was added
         assert len(fig.layout.annotations) == 1
@@ -206,7 +206,7 @@ class TestAddSourceAnnotation:
         import plotly.graph_objects as go
 
         fig = go.Figure()
-        _add_source_annotation(fig)
+        add_source_annotation(fig)
         annotation = fig.layout.annotations[0]
         assert FAIRCAREAI_BRAND["source_note"] in annotation.text
 
@@ -215,16 +215,16 @@ class TestAddSourceAnnotation:
         import plotly.graph_objects as go
 
         fig = go.Figure()
-        _add_source_annotation(fig, "Custom Source")
+        add_source_annotation(fig, "Custom Source")
         annotation = fig.layout.annotations[0]
         assert "Custom Source" in annotation.text
 
     def test_contains_citation(self) -> None:
-        """Test that Van Calster citation is included."""
+        """Test that Van Calster citation is included when passed."""
         import plotly.graph_objects as go
 
         fig = go.Figure()
-        _add_source_annotation(fig)
+        add_source_annotation(fig, citation="Van Calster et al. (2025) Lancet Digit Health")
         annotation = fig.layout.annotations[0]
         assert "Van Calster" in annotation.text
 

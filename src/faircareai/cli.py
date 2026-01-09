@@ -11,6 +11,7 @@ Metrics computed per Van Calster et al. (2025) methodology.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -18,7 +19,14 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
+from faircareai.core.exceptions import (
+    ConfigurationError,
+    DataValidationError,
+    MetricComputationError,
+)
+
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -177,8 +185,15 @@ def audit(
             threshold=threshold,
         )
         console.print(f"  Loaded {len(audit_obj.df):,} records")
+    except (DataValidationError, ConfigurationError, MetricComputationError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        console.print(f"[red]File not found: {e}[/red]")
+        sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error loading data:[/red] {e}")
+        console.print(f"[red]Unexpected error: {e}[/red]")
+        logger.exception("Unexpected error loading data")
         sys.exit(1)
 
     # Handle attributes
@@ -216,8 +231,15 @@ def audit(
     console.print("\n[bold]Running fairness audit...[/bold]")
     try:
         results = audit_obj.run()
+    except (DataValidationError, ConfigurationError, MetricComputationError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        console.print(f"[red]File not found: {e}[/red]")
+        sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error running audit:[/red] {e}")
+        console.print(f"[red]Unexpected error: {e}[/red]")
+        logger.exception("Unexpected error running audit")
         sys.exit(1)
 
     # Display summary
@@ -258,8 +280,18 @@ def audit(
                 results.to_html(str(output_path.with_suffix(".html")))
 
             console.print(f"  [green]Saved to {output_path}[/green]")
+        except (DataValidationError, ConfigurationError, MetricComputationError) as e:
+            console.print(f"[red]Error: {e}[/red]")
+            sys.exit(1)
+        except FileNotFoundError as e:
+            console.print(f"[red]File not found: {e}[/red]")
+            sys.exit(1)
+        except (OSError, PermissionError) as e:
+            console.print(f"[red]File error: {e}[/red]")
+            sys.exit(1)
         except Exception as e:
-            console.print(f"[red]Error exporting:[/red] {e}")
+            console.print(f"[red]Unexpected error: {e}[/red]")
+            logger.exception("Unexpected error exporting results")
             sys.exit(1)
 
 

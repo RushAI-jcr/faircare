@@ -343,11 +343,12 @@ def _compute_calibration_metrics(
         # This is the Van Calster method: logit(Y) = α + offset(logit_p)
         try:
             int_model = Logit(y_true, np.ones_like(y_true), offset=logit_p).fit(disp=0)
-            result["calibration_intercept"] = float(int_model.params.iloc[0])
-        except Exception as e:
+            result["calibration_intercept"] = float(int_model.params[0])
+        except (ValueError, np.linalg.LinAlgError) as e:
             # Fallback to sklearn method if statsmodels fails
             logger.warning(
-                "Statsmodels calibration intercept failed, using sklearn fallback: %s",
+                "Statsmodels calibration intercept failed (%s): %s. Falling back to sklearn.",
+                type(e).__name__,
                 str(e),
             )
             lr_int = LogisticRegression(solver="lbfgs", max_iter=1000)
@@ -358,8 +359,8 @@ def _compute_calibration_metrics(
         lr_slope = LogisticRegression(solver="lbfgs", max_iter=1000)
         lr_slope.fit(logit_p.reshape(-1, 1), y_true)
         result["calibration_slope"] = float(lr_slope.coef_[0, 0])
-    except Exception as e:
-        logger.warning("Calibration slope computation failed: %s", str(e))
+    except (ValueError, np.linalg.LinAlgError) as e:
+        logger.warning("Calibration slope computation failed (%s): %s", type(e).__name__, str(e))
         result["calibration_intercept"] = None
         result["calibration_slope"] = None
 
@@ -555,9 +556,10 @@ def _compute_risk_distribution(
                 "statistic": float(ks_stat),
                 "p_value": float(ks_pval),
             }
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             logger.debug(
-                "Kolmogorov-Smirnov test failed for risk distributions: %s",
+                "Kolmogorov-Smirnov test failed (%s) for risk distributions: %s",
+                type(e).__name__,
                 str(e),
             )
 

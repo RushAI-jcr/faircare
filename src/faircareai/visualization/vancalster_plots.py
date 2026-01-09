@@ -44,7 +44,6 @@ from faircareai.core.config import (
 )
 
 from .themes import (
-    FAIRCAREAI_BRAND,
     GHOSTING_CONFIG,
     GROUP_COLORS,
     LEGEND_POSITIONS,
@@ -53,6 +52,7 @@ from .themes import (
     calculate_chart_height,
     register_plotly_template,
 )
+from .utils import add_source_annotation
 
 register_plotly_template()
 
@@ -193,27 +193,6 @@ def _generate_risk_distribution_alt_text(
         alt_text += "Adequate separation in all groups."
 
     return alt_text
-
-
-def _add_source_annotation(
-    fig: go.Figure,
-    source_note: str | None = None,
-) -> go.Figure:
-    """Add Van Calster citation and source annotation."""
-    citation = "Van Calster et al. (2025) Lancet Digit Health"
-    effective_source = source_note if source_note else FAIRCAREAI_BRAND["source_note"]
-
-    fig.add_annotation(
-        text=f"{effective_source} | Methodology: {citation}",
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=-0.12,
-        showarrow=False,
-        font={"size": TYPOGRAPHY["source_size"], "color": SEMANTIC_COLORS["text_secondary"]},
-        xanchor="left",
-    )
-    return fig
 
 
 # =============================================================================
@@ -429,7 +408,7 @@ def create_auroc_forest_plot(
         meta={"description": alt_text},
     )
 
-    _add_source_annotation(fig, source_note)
+    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
     return fig
 
 
@@ -586,7 +565,7 @@ def create_calibration_plot_by_subgroup(
         meta={"description": alt_text},
     )
 
-    _add_source_annotation(fig, source_note)
+    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
     return fig
 
 
@@ -769,7 +748,7 @@ def create_decision_curve_by_subgroup(
         meta={"description": alt_text},
     )
 
-    _add_source_annotation(fig, source_note)
+    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
     return fig
 
 
@@ -969,7 +948,7 @@ def create_risk_distribution_plot(
             col=i,
         )
 
-    _add_source_annotation(fig, source_note)
+    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
     return fig
 
 
@@ -1223,5 +1202,5 @@ def create_vancalster_dashboard(
         col=2,
     )
 
-    _add_source_annotation(fig)
+    add_source_annotation(fig, citation="Van Calster et al. (2025) Lancet Digit Health")
     return fig

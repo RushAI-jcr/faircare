@@ -817,10 +817,10 @@ def create_fairness_dashboard(results: "AuditResults") -> go.Figure:
     # Add axis titles for each subplot
     fig.update_xaxes(title_text="Subgroup", tickangle=45, tickfont=dict(size=10), row=1, col=1)
     fig.update_yaxes(title_text="AUROC Score", tickfont=dict(size=10), row=1, col=1)
-    
+
     fig.update_xaxes(title_text="Subgroup", tickangle=45, tickfont=dict(size=10), row=1, col=2)
     fig.update_yaxes(title_text="Selection Rate (%)", tickfont=dict(size=10), row=1, col=2)
-    
+
     fig.update_xaxes(title_text="Fairness Metric", tickangle=45, tickfont=dict(size=10), row=2, col=1)
     fig.update_yaxes(title_text="Absolute Disparity", tickfont=dict(size=10), row=2, col=1)
 

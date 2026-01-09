@@ -28,11 +28,6 @@ from faircareai.core.config import (
     get_axis_labels,
     get_label,
 )
-from faircareai.core.constants import (
-    VANCALSTER_ALL_CAUTION,
-    VANCALSTER_ALL_OPTIONAL,
-    VANCALSTER_ALL_RECOMMENDED,
-)
 from faircareai.visualization.themes import (
     FAIRCAREAI_COLORS,
     GOVERNANCE_DISCLAIMER_SHORT,
@@ -43,18 +38,6 @@ from faircareai.visualization.themes import (
 
 if TYPE_CHECKING:
     from faircareai.core.results import AuditResults
-
-
-def _get_metric_category(metric: str) -> str:
-    """Get Van Calster category for a metric."""
-    metric_lower = metric.lower()
-    if metric_lower in VANCALSTER_ALL_RECOMMENDED:
-        return "RECOMMENDED"
-    if metric_lower in VANCALSTER_ALL_OPTIONAL:
-        return "OPTIONAL"
-    if metric_lower in VANCALSTER_ALL_CAUTION:
-        return "CAUTION"
-    return "UNKNOWN"
 
 
 def plot_discrimination_curves(

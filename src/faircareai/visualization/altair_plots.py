@@ -85,6 +85,15 @@ def create_forest_plot_static(
     """Create static forest plot for PDF/PPTX export."""
     ghost_cfg = ghosting_config or GHOSTING_CONFIG
 
+    # Validate required columns exist
+    required_cols = ["group", "n", metric]
+    missing = [c for c in required_cols if c not in metrics_df.columns]
+    if missing or len(metrics_df) == 0:
+        # Return empty chart with error message
+        return alt.Chart().mark_text().encode(
+            text=alt.value(f"Missing columns: {missing}" if missing else "No data")
+        ).properties(title=title or "Error", width=500, height=200)
+
     df = metrics_df.filter(pl.col("group") != "_overall")
     df = df.with_columns(
         [

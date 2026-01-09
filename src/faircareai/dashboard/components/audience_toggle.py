@@ -176,7 +176,7 @@ def get_metric_display(
     display_name = metric_names.get(audience, {}).get(metric, metric.upper())
 
     # Value formatting
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         if metric in ("brier_score", "calibration_slope"):
             formatted_value = f"{value:.3f}"
         elif abs(value) < 0.01:

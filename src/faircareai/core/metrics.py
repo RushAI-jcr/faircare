@@ -5,16 +5,22 @@ Computes group-level performance metrics with confidence intervals.
 Follows statistical standards from CLAUDE.md.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import polars as pl
 
-from faircareai.core.statistics import ci_wilson
+if TYPE_CHECKING:
+    import numpy as np
+
 from faircareai.core.statistical import (
     clopper_pearson_ci,
     get_sample_status,
     get_sample_warning,
 )
+from faircareai.core.statistics import ci_wilson
 
 
 @dataclass
@@ -59,8 +65,8 @@ def _safe_divide(numerator: int, denominator: int, default: float = 0.0) -> floa
 
 
 def compute_confusion_metrics(
-    y_true: "np.ndarray",
-    y_pred: "np.ndarray",
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
     fairness_naming: bool = False,
 ) -> dict[str, float | int]:
     """Compute standard classification metrics from confusion matrix.
@@ -85,7 +91,6 @@ def compute_confusion_metrics(
         >>> cm_fair = compute_confusion_metrics(y_true, y_pred, fairness_naming=True)
         >>> print(f"TPR: {cm_fair['tpr']:.3f}")
     """
-    import numpy as np
     from sklearn.metrics import confusion_matrix as sklearn_cm
 
     from faircareai.core.validation import safe_divide

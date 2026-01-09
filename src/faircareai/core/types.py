@@ -11,9 +11,54 @@ Usage:
         ...
 """
 
+from enum import Enum
 from typing import TypedDict
 
 from typing_extensions import NotRequired
+
+# =============================================================================
+# STATUS ENUMS
+# =============================================================================
+
+
+class StatusLevel(str, Enum):
+    """Status levels for metric threshold evaluations.
+
+    Used throughout the codebase to indicate pass/warn/fail states.
+    Inherits from str for JSON serialization compatibility.
+    """
+
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class GovernanceStatus(str, Enum):
+    """Governance review status for audit results.
+
+    Indicates overall readiness for deployment from governance perspective.
+    """
+
+    READY = "READY"
+    CONDITIONAL = "CONDITIONAL"
+    REVIEW = "REVIEW"
+    FAIL = "FAIL"
+
+
+class SeverityLevel(str, Enum):
+    """Severity levels for audit flags and warnings.
+
+    Used to categorize the importance of identified issues.
+    """
+
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
+# =============================================================================
+# TYPED DICTS
+# =============================================================================
 
 
 class GroupMetrics(TypedDict):

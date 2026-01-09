@@ -33,16 +33,9 @@ from faircareai.core.config import (
     get_axis_labels,
     get_label,
 )
-from faircareai.core.constants import (
-    VANCALSTER_ALL_CAUTION,
-    VANCALSTER_ALL_OPTIONAL,
-    VANCALSTER_ALL_RECOMMENDED,
-)
 
 from .themes import (
     COLORSCALES,
-    EDITORIAL_COLORS,
-    FAIRCAREAI_BRAND,
     GHOSTING_CONFIG,
     GROUP_COLORS,
     LEGEND_POSITIONS,
@@ -54,32 +47,58 @@ from .themes import (
     get_contrast_text_color,
     register_plotly_template,
 )
+from .utils import add_source_annotation, get_metric_category
+from .validation import create_error_figure, validate_required_columns
 
 register_plotly_template()
 
 
 # =============================================================================
-# VAN CALSTER METRIC FILTERING
+# METRIC DISPLAY LABELS
 # =============================================================================
 
+# Module-level constant for metric labels (avoids repeated dictionary creation)
+METRIC_LABELS: dict[str, str] = {
+    "tpr": "True Positive Rate (TPR / Sensitivity)",
+    "tnr": "True Negative Rate (TNR / Specificity)",
+    "ppv": "Positive Predictive Value (PPV / Precision)",
+    "npv": "Negative Predictive Value (NPV)",
+    "fpr": "False Positive Rate (FPR)",
+    "fnr": "False Negative Rate (FNR)",
+    "auroc": "Area Under ROC Curve (AUROC)",
+    "auprc": "Area Under Precision-Recall Curve (AUPRC)",
+    "brier": "Brier Score",
+    "accuracy": "Accuracy",
+    "f1": "F1 Score",
+    "mcc": "Matthews Correlation Coefficient (MCC)",
+    "prevalence": "Prevalence",
+    "sensitivity": "Sensitivity (TPR)",
+    "specificity": "Specificity (TNR)",
+    "precision": "Precision (PPV)",
+}
 
-def _get_metric_category(metric: str) -> str:
-    """Get Van Calster category for a metric.
+
+def get_metric_label(metric: str) -> str:
+    """Get display label for metric, with fallback to uppercase.
 
     Args:
-        metric: Metric name (case-insensitive).
+        metric: Metric name (e.g., "tpr", "auroc")
 
     Returns:
-        One of "RECOMMENDED", "OPTIONAL", "CAUTION", or "UNKNOWN".
+        Human-readable display label
+
+    Example:
+        >>> get_metric_label("tpr")
+        'True Positive Rate (TPR / Sensitivity)'
+        >>> get_metric_label("custom_metric")
+        'CUSTOM_METRIC'
     """
-    metric_lower = metric.lower()
-    if metric_lower in VANCALSTER_ALL_RECOMMENDED:
-        return "RECOMMENDED"
-    if metric_lower in VANCALSTER_ALL_OPTIONAL:
-        return "OPTIONAL"
-    if metric_lower in VANCALSTER_ALL_CAUTION:
-        return "CAUTION"
-    return "UNKNOWN"
+    return METRIC_LABELS.get(metric.lower(), metric.upper())
+
+
+# =============================================================================
+# VAN CALSTER METRIC FILTERING
+# =============================================================================
 
 
 def _should_show_metric(
@@ -97,7 +116,7 @@ def _should_show_metric(
     Returns:
         True if metric should be displayed.
     """
-    category = _get_metric_category(metric)
+    category = get_metric_category(metric)
     if category == "RECOMMENDED":
         return True
     if category == "OPTIONAL":
@@ -124,38 +143,6 @@ def _filter_metrics(
         Filtered list of metrics.
     """
     return [m for m in metrics if _should_show_metric(m, include_optional, include_caution)]
-
-
-# =============================================================================
-# BRANDING HELPER
-# =============================================================================
-
-
-def add_source_annotation(
-    fig: go.Figure,
-    source_note: str | None = None,
-) -> go.Figure:
-    """Add FairCareAI source annotation to a figure.
-
-    Args:
-        fig: Plotly Figure object.
-        source_note: Custom source note (uses brand default if None).
-
-    Returns:
-        Figure with source annotation added.
-    """
-    effective_source = source_note if source_note is not None else FAIRCAREAI_BRAND["source_note"]
-    fig.add_annotation(
-        text=effective_source,
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=-0.12,
-        showarrow=False,
-        font={"size": TYPOGRAPHY["source_size"], "color": EDITORIAL_COLORS["slate"]},
-        xanchor="left",
-    )
-    return fig
 
 
 # =============================================================================
@@ -307,7 +294,7 @@ def generate_heatmap_alt_text(
     max_disparity_value = df["difference"].abs().max()
     max_disparity = (
         float(max_disparity_value)
-        if isinstance(max_disparity_value, (int, float, np.floating))
+        if isinstance(max_disparity_value, int | float | np.floating)
         else 0.0
     )
     n_significant = df.filter(pl.col("statistically_significant")).shape[0]
@@ -383,7 +370,7 @@ def create_forest_plot(
     # Check if metric should be shown based on Van Calster classification
     if not include_optional and not _should_show_metric(metric, include_optional=False):
         fig = go.Figure()
-        category = _get_metric_category(metric)
+        category = get_metric_category(metric)
         fig.add_annotation(
             text=f"Forest plot for '{metric}' requires include_optional=True<br>"
             f"(Van Calster classification: {category})",
@@ -405,21 +392,16 @@ def create_forest_plot(
 
     # Validate required columns exist
     required_cols = ["group", metric, "n"]
-    missing_cols = [col for col in required_cols if col not in metrics_df.columns]
+    missing_cols = validate_required_columns(metrics_df, required_cols)
     if missing_cols:
-        fig = go.Figure()
-        fig.add_annotation(
-            text=f"Missing required columns: {', '.join(missing_cols)}",
-            x=0.5,
-            y=0.5,
-            showarrow=False,
-            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["fail"]),
+        return create_error_figure(
+            f"Missing required columns: {', '.join(missing_cols)}",
+            title=title or metric.upper(),
         )
-        return fig
 
-    df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
+    df = metrics_df.filter(pl.col("group") != "_overall")
 
-    if df.empty:
+    if df.height == 0:
         fig = go.Figure()
         fig.add_annotation(
             text="No data available for visualization",
@@ -431,14 +413,7 @@ def create_forest_plot(
         return fig
 
     if title is None:
-        metric_names = {
-            "tpr": "True Positive Rate (Sensitivity)",
-            "fpr": "False Positive Rate",
-            "ppv": "Positive Predictive Value",
-            "npv": "Negative Predictive Value",
-            "accuracy": "Accuracy",
-        }
-        title = metric_names.get(metric, metric.upper())
+        title = get_metric_label(metric)
 
     fig = go.Figure()
 
@@ -479,10 +454,10 @@ def create_forest_plot(
         )
         return fig
 
-    df = df.sort_values(metric, ascending=True)
+    df = df.sort(metric)
 
     y_labels = []
-    for _idx, row in df.iterrows():
+    for row in df.iter_rows(named=True):
         group = row["group"]
         value = row[metric]
         n = int(row["n"])
@@ -613,44 +588,42 @@ def create_disparity_heatmap(
         "difference",
         "statistically_significant",
     ]
-    missing_cols = [col for col in required_cols if col not in disparity_df.columns]
+    missing_cols = validate_required_columns(disparity_df, required_cols)
     if missing_cols:
-        fig = go.Figure()
-        fig.add_annotation(
-            text=f"Missing required columns: {', '.join(missing_cols)}",
-            x=0.5,
-            y=0.5,
-            showarrow=False,
-            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["fail"]),
+        return create_error_figure(
+            f"Missing required columns: {', '.join(missing_cols)}",
+            title=title,
         )
-        return fig
 
     # Filter for the specified metric
-    df = disparity_df.filter(pl.col("metric") == metric).to_pandas()
+    df = disparity_df.filter(pl.col("metric") == metric)
 
-    if df.empty:
+    if df.height == 0:
         fig = go.Figure()
         fig.add_annotation(text="No disparity data available", x=0.5, y=0.5, showarrow=False)
         return fig
 
     # Get unique groups
-    groups = sorted(set(df["reference_group"].tolist() + df["comparison_group"].tolist()))
+    groups = sorted(set(df["reference_group"].to_list() + df["comparison_group"].to_list()))
     n_groups = len(groups)
+
+    # Create O(1) lookup dictionary for group indices
+    group_to_idx = {g: i for i, g in enumerate(groups)}
 
     # Create matrix
     matrix = np.zeros((n_groups, n_groups))
     sig_matrix = np.zeros((n_groups, n_groups))
 
-    for _, row in df.iterrows():
+    for row in df.iter_rows(named=True):
         ref_group = row["reference_group"]
         comp_group = row["comparison_group"]
 
-        # Validate groups exist before calling .index()
-        if ref_group not in groups or comp_group not in groups:
+        # Validate groups exist in lookup dict
+        if ref_group not in group_to_idx or comp_group not in group_to_idx:
             continue
 
-        ref_idx = groups.index(ref_group)
-        comp_idx = groups.index(comp_group)
+        ref_idx = group_to_idx[ref_group]
+        comp_idx = group_to_idx[comp_group]
         matrix[ref_idx, comp_idx] = row["difference"]
         matrix[comp_idx, ref_idx] = -row["difference"]
         sig_matrix[ref_idx, comp_idx] = row["statistically_significant"]
@@ -782,20 +755,16 @@ def create_metric_comparison_chart(
             return fig
 
     # Validate required columns exist
-    if "group" not in metrics_df.columns:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="Missing required column: 'group'",
-            x=0.5,
-            y=0.5,
-            showarrow=False,
-            font=dict(size=TYPOGRAPHY["body_size"], color=SEMANTIC_COLORS["fail"]),
+    missing_cols = validate_required_columns(metrics_df, ["group"])
+    if missing_cols:
+        return create_error_figure(
+            f"Missing required column: {', '.join(missing_cols)}",
+            title=title,
         )
-        return fig
 
-    df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
+    df = metrics_df.filter(pl.col("group") != "_overall")
 
-    if df.empty:
+    if df.height == 0:
         fig = go.Figure()
         fig.add_annotation(
             text="No data available for visualization",
@@ -806,7 +775,7 @@ def create_metric_comparison_chart(
         )
         return fig
 
-    groups = df["group"].tolist()
+    groups = df["group"].to_list()
 
     fig = go.Figure()
 
@@ -857,13 +826,14 @@ def create_metric_comparison_chart(
         if metric in df.columns:
             display_label = get_metric_display_label(metric)
             bar_color = metric_colors.get(metric, GROUP_COLORS[0])
+            metric_values = df[metric].to_list()
             fig.add_trace(
                 go.Bar(
                     name=display_label,
                     x=groups,
-                    y=df[metric],
+                    y=metric_values,
                     marker_color=bar_color,
-                    text=[f"{v:.0%}" for v in df[metric]],
+                    text=[f"{v:.0%}" for v in metric_values],
                     textposition="inside",
                     textfont=dict(color=get_contrast_text_color(bar_color), size=TYPOGRAPHY["tick_size"]),
                     hovertemplate=(f"<b>%{{x}}</b><br>{display_label}: %{{y:.1%}}<extra></extra>"),
@@ -1263,15 +1233,14 @@ def create_sample_size_waterfall(
     """
     Create waterfall/bar chart showing sample sizes with ghosting indication.
     """
-    df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
-    df = df.sort_values("n", ascending=False)
+    df = metrics_df.filter(pl.col("group") != "_overall").sort("n", descending=True)
 
     ghost_cfg = GHOSTING_CONFIG
 
     colors = []
     opacities = []
 
-    for _, row in df.iterrows():
+    for row in df.iter_rows(named=True):
         n = int(row["n"])
         opacity = ghost_cfg.get_opacity(n)
         opacities.append(opacity)
@@ -1285,16 +1254,18 @@ def create_sample_size_waterfall(
 
     fig = go.Figure()
 
+    groups = df["group"].to_list()
+    n_values = df["n"].to_list()
     fig.add_trace(
         go.Bar(
-            x=df["group"],
-            y=df["n"],
+            x=groups,
+            y=n_values,
             marker=dict(
                 color=colors,
                 opacity=opacities,
                 line=dict(color="white", width=1),
             ),
-            text=[f"{n:,}" for n in df["n"]],
+            text=[f"{n:,}" for n in n_values],
             textposition="inside",
             textfont=dict(color=[get_contrast_text_color(c) for c in colors], size=TYPOGRAPHY["tick_size"]),
             hovertemplate="<b>%{x}</b><br>n = %{y:,}<extra></extra>",
@@ -1405,10 +1376,9 @@ def create_equity_dashboard(
     )
 
     # Forest plot data
-    df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
-    df = df.sort_values(metric, ascending=True)
+    df = metrics_df.filter(pl.col("group") != "_overall").sort(metric)
 
-    for _, row in df.iterrows():
+    for row in df.iter_rows(named=True):
         group = row["group"]
         value = row[metric]
         n = int(row["n"])
@@ -1429,19 +1399,21 @@ def create_equity_dashboard(
         )
 
     # Sample size bars
+    n_values = df["n"].to_list()
     colors = [
         SEMANTIC_COLORS["pass"]
         if n >= 50
         else SEMANTIC_COLORS["warn_dark"]
         if n >= 30
         else SEMANTIC_COLORS["fail"]
-        for n in df["n"]
+        for n in n_values
     ]
 
+    groups = df["group"].to_list()
     fig.add_trace(
         go.Bar(
-            x=df["group"],
-            y=df["n"],
+            x=groups,
+            y=n_values,
             marker_color=colors,
             showlegend=False,
         ),
@@ -1450,7 +1422,7 @@ def create_equity_dashboard(
     )
 
     # Radar chart for fairness metrics (per CHAI spec)
-    for i, (_, row) in enumerate(df.iterrows()):
+    for i, row in enumerate(df.iter_rows(named=True)):
         group = row["group"]
         tpr = row.get("tpr", 0)
         fpr = row.get("fpr", 0)
@@ -1470,10 +1442,11 @@ def create_equity_dashboard(
         )
 
     # Disparity bars (if reference available)
-    if len(df) > 1:
+    if df.height > 1:
         # Use first group as reference for disparity calc
-        ref_value = df[metric].iloc[-1]  # Highest value as reference
-        disparities = df[metric] - ref_value
+        metric_values = df[metric].to_list()
+        ref_value = metric_values[-1]  # Highest value as reference
+        disparities = [v - ref_value for v in metric_values]
 
         bar_colors = [
             SEMANTIC_COLORS["fail"]
@@ -1486,7 +1459,7 @@ def create_equity_dashboard(
 
         fig.add_trace(
             go.Bar(
-                x=df["group"],
+                x=groups,
                 y=disparities,
                 marker_color=bar_colors,
                 showlegend=False,
@@ -1576,7 +1549,7 @@ def create_subgroup_heatmap(
     # Check if metric should be shown based on Van Calster classification
     if not include_optional and not _should_show_metric(metric, include_optional=False):
         fig = go.Figure()
-        category = _get_metric_category(metric)
+        category = get_metric_category(metric)
         fig.add_annotation(
             text=f"Subgroup heatmap for '{metric}' requires include_optional=True<br>"
             f"(Van Calster classification: {category})",
@@ -1606,9 +1579,9 @@ def create_subgroup_heatmap(
         )
         return fig
 
-    df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
+    df = metrics_df.filter(pl.col("group") != "_overall")
 
-    if df.empty:
+    if df.height == 0:
         fig = go.Figure()
         fig.add_annotation(
             text="No data available for visualization",
@@ -1631,7 +1604,7 @@ def create_subgroup_heatmap(
         )
         return fig
 
-    attributes = df["attribute"].unique().tolist()
+    attributes = df["attribute"].unique().to_list()
 
     # Build matrix data
     z_data: list[list[float]] = []
@@ -1639,9 +1612,9 @@ def create_subgroup_heatmap(
     x_labels: list[str] = []
 
     for attr in attributes:
-        attr_df = df[df["attribute"] == attr]
-        groups = attr_df["group"].tolist()
-        values = attr_df[metric].tolist()
+        attr_df = df.filter(pl.col("attribute") == attr)
+        groups = attr_df["group"].to_list()
+        values = attr_df[metric].to_list()
 
         if not x_labels:
             x_labels = groups
@@ -1754,7 +1727,7 @@ def create_fairness_radar(
         )
         return fig
 
-    df = metrics_df.filter(pl.col("group") != "_overall").to_pandas()
+    df = metrics_df.filter(pl.col("group") != "_overall")
 
     fig = go.Figure()
 
@@ -1776,7 +1749,7 @@ def create_fairness_radar(
     available = [m for m in metrics if m in df.columns]
     labels = [metric_labels[metrics.index(m)] for m in available]
 
-    for i, (_, row) in enumerate(df.iterrows()):
+    for i, row in enumerate(df.iter_rows(named=True)):
         group = row["group"]
         values = [row[m] for m in available]
         values.append(values[0])  # Close the polygon

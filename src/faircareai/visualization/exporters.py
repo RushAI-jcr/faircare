@@ -32,6 +32,38 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+
+def _validate_output_path(output_path: Path, base_dir: Path | None = None) -> Path:
+    """Validate output path is within allowed directory.
+
+    Args:
+        output_path: Path to validate
+        base_dir: Base directory to restrict writes to. If None, no validation is performed.
+
+    Returns:
+        Validated resolved path
+
+    Raises:
+        ValueError: If base_dir is provided and output_path is outside base_dir
+    """
+    resolved = output_path.resolve()
+
+    # Only validate if base_dir is explicitly provided
+    if base_dir is not None:
+        base = base_dir.resolve()
+
+        # Ensure output path is within base directory
+        try:
+            resolved.relative_to(base)
+        except ValueError:
+            raise ValueError(
+                f"Security: Output path {resolved} is outside allowed directory {base}. "
+                "This could be a path traversal attempt."
+            ) from None
+
+    return resolved
+
+
 # Type aliases for supported export formats
 PlotlyExportFormat = Literal["png", "pdf", "svg", "html", "json", "jpeg", "webp"]
 AltairExportFormat = Literal["png", "pdf", "svg", "html", "json"]
@@ -100,7 +132,8 @@ def export_plotly_figure(
         >>> export_plotly_figure(fig, "chart.png")
     """
 
-    path = Path(path)
+    path = _validate_output_path(Path(path))
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     # Infer format from extension if not specified
     if format is None:
@@ -170,14 +203,17 @@ def export_plotly_figure(
 
         return path
 
+    except FigureExportError:
+        raise  # Already wrapped, re-raise as-is
+    except (OSError, PermissionError) as e:
+        raise FigureExportError(format=format, reason=f"File write failed: {e}", path=path) from e
+    except (ValueError, TypeError) as e:
+        raise FigureExportError(format=format, reason=f"Invalid figure data: {e}", path=path) from e
+    except ImportError as e:
+        raise FigureExportError(format=format, reason=f"Missing export dependency: {e}", path=path) from e
     except Exception as e:
-        if isinstance(e, FigureExportError):
-            raise
-        raise FigureExportError(
-            format=format,
-            reason=str(e),
-            path=path,
-        ) from e
+        # Safety net for unknown errors
+        raise FigureExportError(format=format, reason=f"Unexpected error: {e}", path=path) from e
 
 
 def export_altair_chart(
@@ -210,7 +246,8 @@ def export_altair_chart(
         >>> export_altair_chart(chart, "chart.svg")
     """
 
-    path = Path(path)
+    path = _validate_output_path(Path(path))
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     # Infer format from extension if not specified
     if format is None:
@@ -267,14 +304,17 @@ def export_altair_chart(
 
         return path
 
+    except FigureExportError:
+        raise  # Already wrapped, re-raise as-is
+    except (OSError, PermissionError) as e:
+        raise FigureExportError(format=format, reason=f"File write failed: {e}", path=path) from e
+    except (ValueError, TypeError) as e:
+        raise FigureExportError(format=format, reason=f"Invalid chart data: {e}", path=path) from e
+    except ImportError as e:
+        raise FigureExportError(format=format, reason=f"Missing export dependency: {e}", path=path) from e
     except Exception as e:
-        if isinstance(e, FigureExportError):
-            raise
-        raise FigureExportError(
-            format=format,
-            reason=str(e),
-            path=path,
-        ) from e
+        # Safety net for unknown errors
+        raise FigureExportError(format=format, reason=f"Unexpected error: {e}", path=path) from e
 
 
 def export_figure_bundle(

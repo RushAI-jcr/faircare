@@ -12,12 +12,10 @@ from typing import Any
 
 import numpy as np
 import polars as pl
-
-from faircareai.core.bootstrap import bootstrap_auroc
-from faircareai.core.types import DisparityIndexResult, FairnessResult
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, roc_auc_score
 
+from faircareai.core.bootstrap import bootstrap_auroc
 from faircareai.core.constants import (
     AUROC_DIFF_MODERATE,
     AUROC_DIFF_NEGLIGIBLE,
@@ -34,11 +32,11 @@ from faircareai.core.constants import (
     DISPARITY_WEIGHT_EQUALIZED_ODDS,
     DISPARITY_WEIGHT_PREDICTIVE_PARITY,
     EQUALIZED_ODDS_THRESHOLD,
-    MIN_BOOTSTRAP_SAMPLES,
     MIN_SAMPLE_SIZE_CALIBRATION,
     MIN_SAMPLE_SIZE_FLAG,
 )
 from faircareai.core.logging import get_logger
+from faircareai.core.types import DisparityIndexResult, FairnessResult
 
 logger = get_logger(__name__)
 

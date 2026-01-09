@@ -16,7 +16,14 @@ from faircareai.core.config import (
 from faircareai.core.disparity import DisparityResult, compute_disparities
 from faircareai.core.metrics import GroupMetrics, compute_group_metrics
 from faircareai.core.results import AuditResults
-from faircareai.core.statistical import newcombe_wilson_ci, wilson_score_ci
+from faircareai.core.statistics import (
+    ci_newcombe_wilson as newcombe_wilson_ci,
+)
+
+# Export modern implementations for backward compatibility
+from faircareai.core.statistics import (
+    ci_wilson as wilson_score_ci,
+)
 
 # Legacy alias for backward compatibility
 FairAudit = FairCareAudit

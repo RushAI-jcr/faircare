@@ -18,9 +18,9 @@ Report Structure (per newspec.md):
 Methodology: Van Calster et al. (2025), CHAI RAIC Checkpoint 1.
 """
 
+import html
 from dataclasses import dataclass
 from datetime import date
-import html
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -28,7 +28,6 @@ import polars as pl
 
 from faircareai.core.logging import get_logger
 from faircareai.visualization.exporters import FigureExportError
-
 from faircareai.visualization.themes import (
     GOVERNANCE_DISCLAIMER_FULL,
     SEMANTIC_COLORS,
@@ -1625,7 +1624,7 @@ def _generate_governance_html(results: "AuditResults") -> str:
     except ImportError as e:
         logger.error("Visualization library missing: %s", e)
         overall_figures_html = '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
-    except Exception as e:
+    except Exception:
         # Keep broad catch for truly unexpected errors
         logger.exception("Unexpected error in governance overall chart generation")
         overall_figures_html = (
@@ -1643,7 +1642,7 @@ def _generate_governance_html(results: "AuditResults") -> str:
     except ImportError as e:
         logger.error("Visualization library missing: %s", e)
         subgroup_figures_html = '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
-    except Exception as e:
+    except Exception:
         # Keep broad catch for truly unexpected errors
         logger.exception("Unexpected error in governance subgroup chart generation")
         subgroup_figures_html = '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'

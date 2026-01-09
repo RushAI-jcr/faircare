@@ -21,6 +21,10 @@ from dataclasses import dataclass
 import numpy as np
 import polars as pl
 
+from faircareai.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 # ==============================================================================
 # Result Dataclasses
 # ==============================================================================
@@ -120,7 +124,9 @@ def compute_ace(
         bin_edges = np.percentile(y_prob, quantiles)
         # Remove duplicate edges (happens when many predictions are identical)
         bin_edges = np.unique(bin_edges)
-    except Exception:
+    except (ValueError, IndexError) as e:
+        # Handle edge cases: empty array, all identical values, etc.
+        logger.debug("Quantile binning failed: %s. Using fallback.", e)
         return (np.nan, 0)
 
     # Assign samples to bins

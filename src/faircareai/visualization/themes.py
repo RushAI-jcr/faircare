@@ -16,6 +16,14 @@ from faircareai.core.citations import (
     METHODOLOGY_STATEMENT,
     VAN_CALSTER_CITATION,
 )
+from faircareai.visualization.constants import (
+    SRGB_BLUE_WEIGHT,
+    SRGB_GAMMA_COEFFICIENT,
+    SRGB_GAMMA_EXPONENT,
+    SRGB_GAMMA_THRESHOLD,
+    SRGB_GREEN_WEIGHT,
+    SRGB_RED_WEIGHT,
+)
 
 # =============================================================================
 # METHODOLOGY CITATION (imported from core.citations)
@@ -90,13 +98,17 @@ def get_contrast_text_color(background_hex: str) -> str:
 
     # Apply gamma correction (linearization)
     def linearize(c: float) -> float:
-        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+        return (
+            c / 12.92
+            if c <= SRGB_GAMMA_THRESHOLD
+            else ((c + 0.055) / SRGB_GAMMA_COEFFICIENT) ** SRGB_GAMMA_EXPONENT
+        )
 
     r_lin, g_lin, b_lin = linearize(r), linearize(g), linearize(b)
 
     # Calculate relative luminance using WCAG formula
-    # Coefficients based on human perception of RGB colors
-    luminance = 0.2126 * r_lin + 0.7152 * g_lin + 0.0722 * b_lin
+    # Coefficients based on human perception of RGB colors (ITU-R BT.709)
+    luminance = SRGB_RED_WEIGHT * r_lin + SRGB_GREEN_WEIGHT * g_lin + SRGB_BLUE_WEIGHT * b_lin
 
     # Calculate contrast ratios with both white and dark text
     # Contrast formula: (L1 + 0.05) / (L2 + 0.05) where L1 > L2

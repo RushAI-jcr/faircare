@@ -14,10 +14,9 @@ from typing import Literal
 
 import polars as pl
 
-from faircareai.core.statistical import (
-    newcombe_wilson_ci,
-    z_test_two_proportions,
-)
+from faircareai.core.statistical import z_test_two_proportions
+from faircareai.core.statistics import ci_newcombe_wilson
+from faircareai.core.types import StatusLevel
 
 
 @dataclass
@@ -33,7 +32,7 @@ class DisparityResult:
     diff_ci_lower: float
     diff_ci_upper: float
     ratio: float  # comparison / reference (disparate impact)
-    status: Literal["pass", "warn", "fail"]
+    status: StatusLevel
     p_value: float | None
     statistically_significant: bool
 
@@ -78,12 +77,15 @@ def compute_disparity(
     abs_diff = abs(difference)
 
     # Compute CI for difference
-    ci_lower, ci_upper = newcombe_wilson_ci(
-        reference_successes,
-        reference_trials,
-        comparison_successes,
-        comparison_trials,
-        confidence,
+    # Note: ci_newcombe_wilson computes p1 - p2, but newcombe_wilson_ci computed p2 - p1
+    # So we swap arguments to maintain compatibility
+    alpha = 1 - confidence
+    ci_lower, ci_upper = ci_newcombe_wilson(
+        comparison_successes,  # Swapped
+        comparison_trials,      # Swapped
+        reference_successes,    # Swapped
+        reference_trials,       # Swapped
+        alpha,
     )
 
     # Compute ratio (disparate impact)
@@ -102,13 +104,13 @@ def compute_disparity(
     statistically_significant = p_value < alpha
 
     # Determine status based on magnitude relative to configured thresholds
-    status: Literal["pass", "warn", "fail"]
+    status: StatusLevel
     if abs_diff >= fail_threshold:
-        status = "fail"  # Outside threshold
+        status = StatusLevel.FAIL  # Outside threshold
     elif abs_diff >= warn_threshold:
-        status = "warn"  # Near threshold
+        status = StatusLevel.WARN  # Near threshold
     else:
-        status = "pass"  # Within threshold
+        status = StatusLevel.PASS  # Within threshold
 
     return DisparityResult(
         reference_group=reference_group,

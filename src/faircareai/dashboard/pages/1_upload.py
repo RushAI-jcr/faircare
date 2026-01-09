@@ -49,7 +49,7 @@ def validate_dataframe(df: pl.DataFrame) -> tuple[bool, list[str]]:
         unique_values = df["y_true"].unique().to_list()
         if not set(unique_values).issubset({0, 1}):
             errors.append(
-                f"Column `y_true` must be binary (0/1). Found values: {unique_values[:10]}"
+                f"Column `y_true` must be binary (0/1). Found {len(unique_values)} unique values"
             )
 
     # Validate y_prob is in [0, 1]
@@ -58,10 +58,10 @@ def validate_dataframe(df: pl.DataFrame) -> tuple[bool, list[str]]:
         max_prob_value = df["y_prob"].max()
 
         min_prob = (
-            float(min_prob_value) if isinstance(min_prob_value, (int, float, Decimal)) else None
+            float(min_prob_value) if isinstance(min_prob_value, int | float | Decimal) else None
         )
         max_prob = (
-            float(max_prob_value) if isinstance(max_prob_value, (int, float, Decimal)) else None
+            float(max_prob_value) if isinstance(max_prob_value, int | float | Decimal) else None
         )
 
         if min_prob is None or max_prob is None:

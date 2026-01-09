@@ -248,7 +248,7 @@ class FairCareAudit:
             pass  # pandas not installed, continue to other checks
 
         # Handle file paths
-        if isinstance(data, (str, Path)):
+        if isinstance(data, str | Path):
             path = Path(data)
             if path.suffix == ".parquet":
                 return pl.read_parquet(path)
@@ -319,8 +319,8 @@ class FairCareAudit:
         pred_min_value = self.df[self.pred_col].min()
         pred_max_value = self.df[self.pred_col].max()
 
-        if not isinstance(pred_min_value, (int, float, Decimal)) or not isinstance(
-            pred_max_value, (int, float, Decimal)
+        if not isinstance(pred_min_value, int | float | Decimal) or not isinstance(
+            pred_max_value, int | float | Decimal
         ):
             raise DataValidationError(
                 f"Prediction column '{self.pred_col}' must contain numeric probability values.",

@@ -16,7 +16,7 @@ import math
 from scipy import stats
 
 # Import modern implementations from statistics.py
-from faircareai.core.statistics import ci_wilson, ci_newcombe_wilson
+from faircareai.core.statistics import ci_newcombe_wilson, ci_wilson
 
 
 def wilson_score_ci(

@@ -108,9 +108,9 @@ class AuditResults:
         prevalence_pct = cohort.get("prevalence_pct", "N/A")
 
         # Format N values
-        n_total_str = f"{n_total:,}" if isinstance(n_total, (int, float)) else str(n_total or "N/A")
+        n_total_str = f"{n_total:,}" if isinstance(n_total, int | float) else str(n_total or "N/A")
         n_positive_str = (
-            f"{n_positive:,}" if isinstance(n_positive, (int, float)) else str(n_positive or "N/A")
+            f"{n_positive:,}" if isinstance(n_positive, int | float) else str(n_positive or "N/A")
         )
 
         # Get Brier score from calibration dict (correct location)

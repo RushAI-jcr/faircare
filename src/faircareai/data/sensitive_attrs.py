@@ -247,7 +247,7 @@ def validate_attribute(
     value_counts = df.group_by(column).len()
     min_count_val = value_counts["len"].min()
     min_count: int | None = None
-    if min_count_val is not None and isinstance(min_count_val, (int, float)):
+    if min_count_val is not None and isinstance(min_count_val, int | float):
         min_count = int(min_count_val)
     if min_count is not None and min_count < 100:
         small_groups = value_counts.filter(pl.col("len") < 100)[column].to_list()
