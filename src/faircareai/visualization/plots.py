@@ -681,8 +681,9 @@ def create_disparity_heatmap(
         ),
         xaxis=dict(
             title=dict(text="Comparison Group", font=dict(size=TYPOGRAPHY["axis_title_size"])),
-            tickangle=-45,
+            tickangle=-40,
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
+            automargin=True,
         ),
         yaxis=dict(
             title=dict(text="Reference Group", font=dict(size=TYPOGRAPHY["axis_title_size"])),
@@ -1293,8 +1294,9 @@ def create_sample_size_waterfall(
         ),
         xaxis=dict(
             title=dict(text="Group", font=dict(size=TYPOGRAPHY["axis_title_size"])),
-            tickangle=-45,
+            tickangle=-40,
             tickfont=dict(size=TYPOGRAPHY["tick_size"]),
+            automargin=True,
         ),
         yaxis=dict(
             title=dict(text="Sample Size (n)", font=dict(size=TYPOGRAPHY["axis_title_size"])),

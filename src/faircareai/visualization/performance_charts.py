@@ -237,7 +237,7 @@ def plot_discrimination_curves(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.35,
+        y=-0.42,  # Moved down for better spacing below legend
         showarrow=False,
         font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
     )
@@ -374,7 +374,7 @@ def plot_calibration_curve(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.22,  # Moved down to avoid overlap with rotated x-axis labels
+        y=-0.28,  # Moved down to avoid overlap with axis title
         showarrow=False,
         font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
     )
@@ -680,7 +680,7 @@ def plot_decision_curve(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.18,  # Moved down to avoid overlap with rotated x-axis labels
+        y=-0.25,  # Consistent spacing below chart
         showarrow=False,
         font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
     )

@@ -815,13 +815,13 @@ def create_fairness_dashboard(results: "AuditResults") -> go.Figure:
     )
 
     # Add axis titles for each subplot
-    fig.update_xaxes(title_text="Subgroup", tickangle=45, tickfont=dict(size=10), row=1, col=1)
+    fig.update_xaxes(title_text="Subgroup", tickangle=-40, tickfont=dict(size=10), automargin=True, row=1, col=1)
     fig.update_yaxes(title_text="AUROC Score", tickfont=dict(size=10), row=1, col=1)
 
-    fig.update_xaxes(title_text="Subgroup", tickangle=45, tickfont=dict(size=10), row=1, col=2)
+    fig.update_xaxes(title_text="Subgroup", tickangle=-40, tickfont=dict(size=10), automargin=True, row=1, col=2)
     fig.update_yaxes(title_text="Selection Rate (%)", tickfont=dict(size=10), row=1, col=2)
 
-    fig.update_xaxes(title_text="Fairness Metric", tickangle=45, tickfont=dict(size=10), row=2, col=1)
+    fig.update_xaxes(title_text="Fairness Metric", tickangle=-40, tickfont=dict(size=10), automargin=True, row=2, col=1)
     fig.update_yaxes(title_text="Absolute Disparity", tickfont=dict(size=10), row=2, col=1)
 
     # Style subplot titles smaller to avoid collisions
@@ -1036,7 +1036,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.F
     )
     fig_auroc.update_layout(
         height=300,
-        margin=dict(l=20, r=20, t=70, b=60),
+        margin=dict(l=20, r=20, t=70, b=100),
         annotations=[
             dict(
                 text=f"<b>{auroc_status}</b>",
@@ -1116,7 +1116,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.F
             tickformat=".0%",
         ),
         height=320,
-        margin=dict(l=50, r=20, t=70, b=70),
+        margin=dict(l=50, r=20, t=70, b=100),
         legend=dict(x=0.02, y=0.98, font=dict(size=14)),
         annotations=[
             dict(
@@ -1133,7 +1133,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.F
                 xref="paper",
                 yref="paper",
                 x=0.5,
-                y=-0.18,
+                y=-0.25,  # Consistent spacing below chart
                 showarrow=False,
                 font=dict(size=14, color="#666"),
                 xanchor="center",
@@ -1175,7 +1175,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.F
     )
     fig_brier.update_layout(
         height=300,
-        margin=dict(l=20, r=20, t=70, b=60),
+        margin=dict(l=20, r=20, t=70, b=100),
         annotations=[
             dict(
                 text=f"<b>{brier_status}</b> (lower is better)",
@@ -1235,7 +1235,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.F
             title="Percentage of Patients", range=[0, 110], ticksuffix="%", tickfont={"size": 14}
         ),
         height=300,
-        margin=dict(l=40, r=20, t=70, b=60),
+        margin=dict(l=40, r=20, t=70, b=100),
         showlegend=False,
         annotations=[
             dict(
@@ -1243,7 +1243,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, go.F
                 xref="paper",
                 yref="paper",
                 x=0.5,
-                y=-0.18,
+                y=-0.25,  # Consistent spacing below chart
                 showarrow=False,
                 font=dict(size=14, color="#666"),
                 xanchor="center",
@@ -1471,41 +1471,28 @@ def _create_subgroup_bar_chart(
             annotation_font=dict(size=14),
         )
 
-    # Build annotations list
-    annotations = []
-    if explanation:
-        annotations.append(
-            dict(
-                text=explanation,
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=-0.28,
-                showarrow=False,
-                font=dict(size=14, color="#666"),
-                xanchor="center",
-            )
-        )
+    # No in-chart annotations - they overlap with labels
+    # Explanation text will be added via HTML wrapper in generator.py
 
     fig.update_layout(
         title=dict(text=f"<b>{title}</b>", font=dict(size=16)),
         xaxis=dict(
             title=x_axis_title,
-            tickfont={"size": 14},
-            tickangle=45 if len(groups) > 4 else 0,
-            title_font=dict(size=14),
+            tickfont={"size": 11},
+            tickangle=-40,  # Moderate angle for readability
+            title_font=dict(size=13),
+            automargin=True,  # Auto-adjust margin for labels
         ),
         yaxis=dict(
             title=y_axis_title,
             range=y_range,
             ticksuffix=y_suffix,
-            tickfont={"size": 14},
-            title_font=dict(size=14),
+            tickfont={"size": 13},
+            title_font=dict(size=13),
         ),
-        height=280,
-        margin=dict(l=60, r=20, t=55, b=90),
+        height=380,  # Good height for chart
+        margin=dict(l=70, r=30, t=60, b=130),  # Bottom margin for rotated labels only
         showlegend=False,
-        annotations=annotations if annotations else None,
     )
 
     return fig

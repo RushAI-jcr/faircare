@@ -825,14 +825,37 @@ def _generate_subgroup_section(results: "AuditResults") -> str:
         )
 
         all_figures = create_governance_subgroup_figures(results)
+        # Chart explanations (shown as HTML below each chart for better spacing)
+        CHART_EXPLANATIONS = {
+            "Model Accuracy (AUROC) by Demographic Group": (
+                "Does the model perform equally well across all groups? "
+                "All bars should be similar height (difference <0.05 is ideal). "
+                "Lower bars = less accurate for that group."
+            ),
+            "Sensitivity: % of Actual Cases Detected by Group": (
+                "Of patients who develop the outcome, what % does the model correctly identify? "
+                "Fairness goal: Differences between groups should be <10 percentage points."
+            ),
+            "False Alarms: % Incorrectly Flagged by Group": (
+                "Of patients without the outcome, what % are incorrectly flagged? "
+                "Lower is better. Higher FPR = more unnecessary interventions for that group."
+            ),
+            "Intervention Rate: % Flagged as High-Risk by Group": (
+                "What % of each group is flagged as high-risk? "
+                "Large differences may indicate disparate treatment."
+            ),
+        }
+
         chart_parts = []
         for attr_name, figures in all_figures.items():
             chart_parts.append(f'<h3 style="margin-top: 30px; color: #2c5282;">{attr_name.replace("_", " ").title()}</h3>')
-            chart_parts.append('<div class="chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;">')
+            chart_parts.append('<div class="subgroup-charts" style="display: flex; flex-direction: column; gap: 40px; margin-top: 20px;">')
             for title, fig in figures.items():
                 if fig is not None:
                     fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{attr_name}-{title.replace(' ', '-').lower()}")
-                    chart_parts.append(f'<div>{fig_html}</div>')
+                    explanation = CHART_EXPLANATIONS.get(title, "")
+                    explanation_html = f'<p style="color: #666; font-size: 13px; margin-top: 8px; padding: 0 20px;">{explanation}</p>' if explanation else ""
+                    chart_parts.append(f'<div style="margin-bottom: 20px;">{fig_html}{explanation_html}</div>')
             chart_parts.append('</div>')
         charts_html = ''.join(chart_parts)
     except (ValueError, TypeError, KeyError) as e:
