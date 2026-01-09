@@ -397,8 +397,8 @@ class TestGetRecommendedExportSettings:
         """Test recommended settings for presentation purpose."""
         settings = get_recommended_export_settings("presentation")
 
-        assert settings["width"] == 1200
-        assert settings["height"] == 800
+        assert settings["width"] == 1000  # Phase 6: PDF-friendly size
+        assert settings["height"] == 700
         assert settings["scale"] == 2.0
         assert settings["format"] == "png"
 
@@ -406,8 +406,8 @@ class TestGetRecommendedExportSettings:
         """Test recommended settings for journal purpose."""
         settings = get_recommended_export_settings("journal")
 
-        assert settings["width"] == 1200
-        assert settings["height"] == 800
+        assert settings["width"] == 1000  # Phase 6: PDF-friendly size
+        assert settings["height"] == 700
         assert settings["format"] == "pdf"
 
     def test_unknown_purpose_returns_presentation(self) -> None:

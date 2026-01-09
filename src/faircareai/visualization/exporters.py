@@ -17,7 +17,7 @@ Example:
     >>> from faircareai.visualization import create_forest_plot
     >>> from faircareai.visualization.exporters import export_plotly_figure
     >>> fig = create_forest_plot(metrics_df)
-    >>> export_plotly_figure(fig, "forest_plot.png", width=1200, height=800)
+    >>> export_plotly_figure(fig, "forest_plot.png", width=1000, height=700)
 """
 
 from pathlib import Path
@@ -103,8 +103,8 @@ def export_plotly_figure(
     fig: "go.Figure",
     path: str | Path,
     format: PlotlyExportFormat | None = None,
-    width: int = 1200,
-    height: int = 800,
+    width: int = 1000,  # PDF-friendly default (fits in standard page margins)
+    height: int = 700,
     scale: float = 2.0,
 ) -> Path:
     """Export Plotly figure to a static file.
@@ -321,8 +321,8 @@ def export_figure_bundle(
     fig: "go.Figure | alt.Chart",
     base_path: str | Path,
     formats: list[PlotlyExportFormat] | None = None,
-    width: int = 1200,
-    height: int = 800,
+    width: int = 1000,  # PDF-friendly default
+    height: int = 700,
     scale: float = 2.0,
 ) -> dict[str, Path]:
     """Export a figure to multiple formats at once.
@@ -439,15 +439,15 @@ def get_recommended_export_settings(
             "format": "png",
         },
         "presentation": {
-            "width": 1200,
-            "height": 800,
+            "width": 1000,  # Fits standard slides and PDF margins
+            "height": 700,
             "scale": 2.0,
             "format": "png",
         },
         "journal": {
-            "width": 1200,
-            "height": 800,
-            "scale": 1.0,  # Vector, scale doesn't matter
+            "width": 1000,  # PDF-friendly (fits in standard page margins)
+            "height": 700,
+            "scale": 2.0,  # Higher quality for journal submission
             "format": "pdf",
         },
     }

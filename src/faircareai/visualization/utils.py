@@ -87,7 +87,7 @@ def add_source_annotation(
         xref="paper",
         yref="paper",
         x=0,
-        y=-0.12,
+        y=-0.18,  # Moved down to avoid overlap with rotated x-axis labels
         showarrow=False,
         font={"size": TYPOGRAPHY["source_size"], "color": EDITORIAL_COLORS["slate"]},
         xanchor="left",

@@ -374,7 +374,7 @@ def plot_calibration_curve(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.15,
+        y=-0.22,  # Moved down to avoid overlap with rotated x-axis labels
         showarrow=False,
         font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
     )
@@ -680,7 +680,7 @@ def plot_decision_curve(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.12,
+        y=-0.18,  # Moved down to avoid overlap with rotated x-axis labels
         showarrow=False,
         font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
     )

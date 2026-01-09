@@ -463,9 +463,9 @@ def create_go_nogo_scorecard(results: "AuditResults") -> go.Figure:
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.18,
+        y=-0.22,  # Moved down to avoid overlap with rotated x-axis labels
         showarrow=False,
-        font=dict(size=9, color=FAIRCAREAI_COLORS["gray"]),
+        font=dict(size=10, color=FAIRCAREAI_COLORS["gray"]),  # WCAG 2.1 AA minimum
     )
 
     return fig
@@ -833,9 +833,9 @@ def create_fairness_dashboard(results: "AuditResults") -> go.Figure:
     fig.add_annotation(
         text="<i>Source: FairCareAI Analysis | Methodology: Van Calster et al. (2025)</i>",
         xref="paper", yref="paper",
-        x=0, y=-0.12,
+        x=0, y=-0.18,  # Moved down to avoid overlap with rotated x-axis labels
         showarrow=False,
-        font=dict(size=9, color="#6B6B6B"),
+        font=dict(size=10, color="#6B6B6B"),  # WCAG 2.1 AA minimum
         xanchor="left",
     )
 

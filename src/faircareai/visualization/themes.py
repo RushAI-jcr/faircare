@@ -291,7 +291,7 @@ TYPOGRAPHY: dict[str, Any] = {
     # Body and label sizes
     "body_size": 11,  # body text
     "label_size": 10,  # tick labels
-    "small_size": 9,   # footnotes, source notes
+    "small_size": 10,  # footnotes, source notes (WCAG 2.1 AA minimum)
     # Font weights
     "heading_weight": 700,  # Bold titles
     "subheading_weight": 600,
@@ -301,7 +301,7 @@ TYPOGRAPHY: dict[str, Any] = {
     "headline_size": 16,  # Main figure title (serif, bold)
     "deck_size": 12,      # Subtitle/context (sans, normal)
     "annotation_size": 10, # Data labels on charts
-    "source_size": 9,     # Source attribution (italic)
+    "source_size": 10,    # Source attribution (italic, WCAG 2.1 AA minimum)
     "callout_size": 10,   # Callout annotations
     # Axis typography - readable at publication scale
     "axis_title_size": 11,  # X/Y axis labels
@@ -543,19 +543,19 @@ def calculate_chart_height(n_items: int, chart_type: str = "default") -> int:
     Args:
         n_items: Number of items (groups, rows, categories) in the chart.
         chart_type: Type of chart for specific height rules.
-            - "default": General purpose (base=300, per_item=50, max=800)
-            - "forest": Forest plots (base=300, per_item=50, max=800)
-            - "heatmap": Heatmaps (base=300, per_item=60, max=900)
-            - "bar": Bar charts (base=400, per_item=30, max=700)
+            - "default": General purpose (base=300, per_item=50, max=1000)
+            - "forest": Forest plots (base=300, per_item=50, max=1000)
+            - "heatmap": Heatmaps (base=300, per_item=60, max=1100)
+            - "bar": Bar charts (base=400, per_item=35, max=900)
 
     Returns:
         Calculated height in pixels.
     """
     configs = {
-        "default": {"base": 300, "per_item": 50, "max": 800},
-        "forest": {"base": 300, "per_item": 50, "max": 800},
-        "heatmap": {"base": 300, "per_item": 60, "max": 900},
-        "bar": {"base": 400, "per_item": 30, "max": 700},
+        "default": {"base": 300, "per_item": 50, "max": 1000},
+        "forest": {"base": 300, "per_item": 50, "max": 1000},
+        "heatmap": {"base": 300, "per_item": 60, "max": 1100},
+        "bar": {"base": 400, "per_item": 35, "max": 900},
     }
     cfg = configs.get(chart_type, configs["default"])
     return min(cfg["max"], max(cfg["base"], cfg["base"] + n_items * cfg["per_item"]))
@@ -586,7 +586,7 @@ def get_plotly_template(editorial_mode: bool = True) -> dict:
                 "yanchor": "top",
             },
             # Pure white backgrounds for professional style
-            "margin": {"l": 80, "r": 40, "t": 80, "b": 120},  # Extra bottom for rotated labels
+            "margin": {"l": 100, "r": 50, "t": 100, "b": 140},  # Extra margins for long labels
             "xaxis": {
                 "showgrid": False,
                 "showline": True,

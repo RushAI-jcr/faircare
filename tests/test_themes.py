@@ -240,7 +240,7 @@ class TestCalculateChartHeight:
     def test_max_height_enforced(self) -> None:
         """Test that maximum height is enforced."""
         height = calculate_chart_height(100)
-        assert height <= 800
+        assert height <= 1000  # Phase 6: increased max from 800 to 1000
 
     def test_forest_chart_type(self) -> None:
         """Test forest chart type."""

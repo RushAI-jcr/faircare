@@ -558,7 +558,7 @@ def create_forest_plot(
         ),
         template="faircareai",
         height=calculate_chart_height(len(df), "forest"),
-        margin=dict(l=180, r=100, t=100, b=80),  # Wider left margin for labels with sample sizes
+        margin=dict(l=180, r=100, t=100, b=140),  # Wider left margin; extra bottom for rotated labels
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
 
@@ -692,7 +692,7 @@ def create_disparity_heatmap(
         annotations=annotations,
         template="faircareai",
         height=calculate_chart_height(n_groups, "bar"),
-        margin=dict(l=120, r=40, t=120, b=100),  # Proper margins for title and source
+        margin=dict(l=120, r=40, t=120, b=160),  # Extra bottom margin for rotated labels + annotations
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
 
@@ -1218,7 +1218,7 @@ def create_roc_curve_by_group(
         legend=LEGEND_POSITIONS["bottom_right_inset"],
         template="faircareai",
         height=500,
-        margin=dict(l=80, r=40, t=100, b=100),  # Proper margins for title and source
+        margin=dict(l=80, r=60, t=100, b=120),  # Extra bottom/right margin for legend
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
 
@@ -1302,6 +1302,7 @@ def create_sample_size_waterfall(
         ),
         template="faircareai",
         height=400,
+        margin=dict(l=80, r=40, t=100, b=160),  # Extra bottom margin for rotated labels
         showlegend=False,
     )
 

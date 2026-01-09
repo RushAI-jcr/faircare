@@ -484,6 +484,13 @@ def _generate_full_report_html(results: "AuditResults") -> str:
             font-size: {TYPOGRAPHY["body_size"]}px;
         }}
 
+        /* Responsive chart grid - single column on tablets/mobile */
+        @media (max-width: 900px) {{
+            .chart-grid, .figure-grid {{
+                grid-template-columns: 1fr !important;
+            }}
+        }}
+
         @media print {{
             body {{ background: white; }}
             .section {{ box-shadow: none; border: 1px solid #ddd; }}
@@ -685,7 +692,7 @@ def _generate_performance_section(results: "AuditResults") -> str:
         )
 
         figures = create_governance_overall_figures(results)
-        chart_parts = ['<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">']
+        chart_parts = ['<div class="chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">']
         for title, fig in figures.items():
             if fig is not None:
                 fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{title.replace(' ', '-').lower()}")
@@ -821,7 +828,7 @@ def _generate_subgroup_section(results: "AuditResults") -> str:
         chart_parts = []
         for attr_name, figures in all_figures.items():
             chart_parts.append(f'<h3 style="margin-top: 30px; color: #2c5282;">{attr_name.replace("_", " ").title()}</h3>')
-            chart_parts.append('<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;">')
+            chart_parts.append('<div class="chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;">')
             for title, fig in figures.items():
                 if fig is not None:
                     fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{attr_name}-{title.replace(' ', '-').lower()}")
