@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from faircareai.core.logging import get_logger
+from faircareai.visualization.exporters import FigureExportError
 
 from faircareai.visualization.themes import (
     GOVERNANCE_DISCLAIMER_FULL,
@@ -40,6 +41,37 @@ if TYPE_CHECKING:
 
 
 logger = get_logger(__name__)
+
+
+def _validate_output_path(output_path: Path, base_dir: Path | None = None) -> Path:
+    """Validate output path is within allowed directory.
+
+    Args:
+        output_path: Path to validate
+        base_dir: Base directory to restrict writes to. If None, no validation is performed.
+
+    Returns:
+        Validated resolved path
+
+    Raises:
+        ValueError: If base_dir is provided and output_path is outside base_dir
+    """
+    resolved = output_path.resolve()
+
+    # Only validate if base_dir is explicitly provided
+    if base_dir is not None:
+        base = base_dir.resolve()
+
+        # Ensure output path is within base directory
+        try:
+            resolved.relative_to(base)
+        except ValueError:
+            raise ValueError(
+                f"Security: Output path {resolved} is outside allowed directory {base}. "
+                "This could be a path traversal attempt."
+            ) from None
+
+    return resolved
 
 
 @dataclass
@@ -99,7 +131,8 @@ def generate_pdf_report(
             "pip install 'faircareai[export]' && playwright install chromium"
         ) from err
 
-    output_path = Path(output_path)
+    output_path = _validate_output_path(Path(output_path))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Generate HTML content
     html_content = _generate_report_html(summary, include_charts)
@@ -109,8 +142,8 @@ def generate_pdf_report(
         browser = p.chromium.launch()
         page = browser.new_page()
 
-        # Load HTML content
-        page.set_content(html_content, wait_until="networkidle")
+        # Load HTML content with timeout protection (60s for complex reports)
+        page.set_content(html_content, wait_until="networkidle", timeout=60000)
 
         # Generate PDF with print styling
         page.pdf(
@@ -148,7 +181,8 @@ def generate_pptx_deck(
             "Install with: pip install 'faircareai[export]'"
         ) from err
 
-    output_path = Path(output_path)
+    output_path = _validate_output_path(Path(output_path))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Create presentation
     prs = Presentation()
@@ -199,7 +233,8 @@ def generate_html_report(
     Returns:
         Path to generated HTML file
     """
-    output_path = Path(output_path)
+    output_path = _validate_output_path(Path(output_path))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     html_content = _generate_full_report_html(results)
 
@@ -651,19 +686,19 @@ def _generate_performance_section(results: "AuditResults") -> str:
         )
 
         figures = create_governance_overall_figures(results)
-        charts_html = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">'
+        chart_parts = ['<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">']
         for title, fig in figures.items():
             if fig is not None:
                 fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{title.replace(' ', '-').lower()}")
-                charts_html += f'<div>{fig_html}</div>'
-        charts_html += '</div>'
-    except Exception as e:
-        logger.warning(
-            "Failed to generate interactive charts for performance section: %s",
-            str(e),
-            exc_info=True,
-        )
+                chart_parts.append(f'<div>{fig_html}</div>')
+        chart_parts.append('</div>')
+        charts_html = ''.join(chart_parts)
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning("Performance chart generation failed: %s", e)
         charts_html = f'<div class="chart-placeholder">Interactive charts could not be generated: {html.escape(str(e))}</div>'
+    except ImportError as e:
+        logger.error("Chart library not available: %s", e)
+        charts_html = '<div class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</div>'
 
     return f"""
     <section class="section">
@@ -784,21 +819,22 @@ def _generate_subgroup_section(results: "AuditResults") -> str:
         )
 
         all_figures = create_governance_subgroup_figures(results)
+        chart_parts = []
         for attr_name, figures in all_figures.items():
-            charts_html += f'<h3 style="margin-top: 30px; color: #2c5282;">{attr_name.replace("_", " ").title()}</h3>'
-            charts_html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;">'
+            chart_parts.append(f'<h3 style="margin-top: 30px; color: #2c5282;">{attr_name.replace("_", " ").title()}</h3>')
+            chart_parts.append('<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;">')
             for title, fig in figures.items():
                 if fig is not None:
                     fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{attr_name}-{title.replace(' ', '-').lower()}")
-                    charts_html += f'<div>{fig_html}</div>'
-            charts_html += '</div>'
-    except Exception as e:
-        logger.warning(
-            "Failed to generate interactive charts for subgroup section: %s",
-            str(e),
-            exc_info=True,
-        )
+                    chart_parts.append(f'<div>{fig_html}</div>')
+            chart_parts.append('</div>')
+        charts_html = ''.join(chart_parts)
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning("Subgroup chart generation failed: %s", e)
         charts_html = f'<div class="chart-placeholder">Interactive charts could not be generated: {html.escape(str(e))}</div>'
+    except ImportError as e:
+        logger.error("Chart library not available: %s", e)
+        charts_html = '<div class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</div>'
 
     return f"""
     <section class="section">
@@ -924,7 +960,7 @@ def _generate_fairness_section(results: "AuditResults") -> str:
 
 def _generate_flags_section(results: "AuditResults") -> str:
     """Generate Section 6: Flags and Warnings."""
-    flags_html = ""
+    flag_parts = []
 
     for flag in results.flags:
         severity = flag.get("severity", "warning")
@@ -932,15 +968,14 @@ def _generate_flags_section(results: "AuditResults") -> str:
         message = flag.get("message", "")
         details = flag.get("details", "")
 
-        flags_html += f"""
+        flag_parts.append(f"""
         <div class="flag-item {flag_class}">
             <strong>{severity.upper()}:</strong> {html.escape(message)}
             {f"<br><small>{html.escape(details)}</small>" if details else ""}
         </div>
-        """
+        """)
 
-    if not flags_html:
-        flags_html = '<p style="color: green;">No flags or warnings raised.</p>'
+    flags_html = ''.join(flag_parts) if flag_parts else '<p style="color: green;">No flags or warnings raised.</p>'
 
     return f"""
     <section class="section">
@@ -1033,8 +1068,12 @@ def _generate_report_html(
 
             chart = create_forest_plot_static(summary.metrics_df, metric="tpr")
             charts_html = f'<div class="chart-container">{chart.to_html()}</div>'
-        except Exception:
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning("Forest plot generation failed: %s", e)
             charts_html = '<p class="chart-placeholder">Charts could not be generated.</p>'
+        except ImportError as e:
+            logger.error("Chart library not available: %s", e)
+            charts_html = '<p class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</p>'
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1453,7 +1492,8 @@ def generate_governance_html_report(
     Returns:
         Path to generated HTML file
     """
-    output_path = Path(output_path)
+    output_path = _validate_output_path(Path(output_path))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     html_content = _generate_governance_html(results)
 
@@ -1505,7 +1545,8 @@ def generate_governance_pdf_report(
             "pip install 'faircareai[export]' && playwright install chromium"
         ) from err
 
-    output_path = Path(output_path)
+    output_path = _validate_output_path(Path(output_path))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Generate HTML with interactive charts
     html_content = _generate_governance_html(results)
@@ -1521,8 +1562,8 @@ def generate_governance_pdf_report(
         browser = p.chromium.launch()
         page = browser.new_page()
 
-        # Load HTML content
-        page.set_content(html_content, wait_until="networkidle")
+        # Load HTML content with timeout protection (60s for complex reports)
+        page.set_content(html_content, wait_until="networkidle", timeout=60000)
 
         # Generate PDF with print styling
         page.pdf(
@@ -1575,27 +1616,37 @@ def _generate_governance_html(results: "AuditResults") -> str:
     # Generate interactive figures (work in both HTML and PDF via Playwright)
     try:
         overall_figures_html = _render_governance_overall_figures(results)
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning("Governance overall chart generation failed: %s", e)
+        overall_figures_html = '<p class="chart-placeholder">Overall figures could not be generated.</p>'
+    except FigureExportError as e:
+        logger.warning("Chart export failed: %s", e)
+        overall_figures_html = f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
+    except ImportError as e:
+        logger.error("Visualization library missing: %s", e)
+        overall_figures_html = '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
     except Exception as e:
-        logger.warning(
-            "Failed to generate governance overall figures: %s",
-            str(e),
-            exc_info=True,
-        )
+        # Keep broad catch for truly unexpected errors
+        logger.exception("Unexpected error in governance overall chart generation")
         overall_figures_html = (
             '<p class="chart-placeholder">Overall figures could not be generated.</p>'
         )
 
     try:
         subgroup_figures_html = _render_governance_subgroup_figures(results)
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning("Governance subgroup chart generation failed: %s", e)
+        subgroup_figures_html = '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
+    except FigureExportError as e:
+        logger.warning("Chart export failed: %s", e)
+        subgroup_figures_html = f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
+    except ImportError as e:
+        logger.error("Visualization library missing: %s", e)
+        subgroup_figures_html = '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
     except Exception as e:
-        logger.warning(
-            "Failed to generate governance subgroup figures: %s",
-            str(e),
-            exc_info=True,
-        )
-        subgroup_figures_html = (
-            '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
-        )
+        # Keep broad catch for truly unexpected errors
+        logger.exception("Unexpected error in governance subgroup chart generation")
+        subgroup_figures_html = '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
 
     # Plain language summary (use computed values from above)
     n_pass = gov.get("n_pass", gov.get("within_threshold_count", 0))
@@ -1929,12 +1980,18 @@ def _render_governance_overall_figures(results: "AuditResults") -> str:
                 """)
         html_parts.append("</div>")
         return "".join(html_parts)
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning("Governance overall figure rendering failed: %s", e)
+        return f'<p class="chart-placeholder">Overall figures could not be generated: {html.escape(str(e))}</p>'
+    except FigureExportError as e:
+        logger.warning("Chart export failed: %s", e)
+        return f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
+    except ImportError as e:
+        logger.error("Visualization library missing: %s", e)
+        return '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
     except Exception as e:
-        logger.warning(
-            "Failed to render governance overall figures: %s",
-            str(e),
-            exc_info=True,
-        )
+        # Keep broad catch for truly unexpected errors
+        logger.exception("Unexpected error rendering governance overall figures")
         return f'<p class="chart-placeholder">Overall figures could not be generated: {html.escape(str(e))}</p>'
 
 
@@ -1976,12 +2033,18 @@ def _render_governance_subgroup_figures(results: "AuditResults") -> str:
             if html_parts
             else '<p class="chart-placeholder">No subgroup figures available.</p>'
         )
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning("Governance subgroup figure rendering failed: %s", e)
+        return f'<p class="chart-placeholder">Subgroup figures could not be generated: {html.escape(str(e))}</p>'
+    except FigureExportError as e:
+        logger.warning("Chart export failed: %s", e)
+        return f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
+    except ImportError as e:
+        logger.error("Visualization library missing: %s", e)
+        return '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
     except Exception as e:
-        logger.warning(
-            "Failed to render governance subgroup figures: %s",
-            str(e),
-            exc_info=True,
-        )
+        # Keep broad catch for truly unexpected errors
+        logger.exception("Unexpected error rendering governance subgroup figures")
         return f'<p class="chart-placeholder">Subgroup figures could not be generated: {html.escape(str(e))}</p>'
 
 
@@ -2048,11 +2111,7 @@ def _generate_plain_language_findings(results: "AuditResults") -> str:
             f"<strong>Warning:</strong> Small sample size (N = {n_total:,}) limits reliability of results."
         )
 
-    html = ""
-    for finding in findings:
-        html += f'<div class="finding-item">{finding}</div>'
-
-    return html
+    return ''.join(f'<div class="finding-item">{finding}</div>' for finding in findings)
 
 
 def _get_detection_summary(n_errors: int, n_warnings: int) -> str:

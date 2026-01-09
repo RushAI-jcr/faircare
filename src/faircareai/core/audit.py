@@ -588,6 +588,108 @@ class FairCareAudit:
 
         return get_fairness_metric_options(self.config.use_case_type)
 
+    def _validate_audit_config(self) -> None:
+        """Validate audit configuration before running.
+
+        Raises:
+            ConfigurationError: If config is invalid or incomplete
+        """
+        # Validate config
+        config_issues = self.config.validate()
+        errors = [i for i in config_issues if i.startswith("ERROR")]
+        if errors:
+            raise ConfigurationError(
+                "fairness_config",
+                "Configuration errors:\n" + "\n".join(errors) + "\n\n"
+                "Use audit.suggest_fairness_metric() for recommendations, then set:\n"
+                "  config.primary_fairness_metric = FairnessMetric.EQUALIZED_ODDS\n"
+                "  config.fairness_justification = 'Your justification here'",
+            )
+
+        if not self.sensitive_attributes:
+            raise ConfigurationError(
+                "sensitive_attributes",
+                "At least one sensitive attribute required.\n"
+                "Use audit.suggest_attributes() to see suggestions, then:\n"
+                "  audit.accept_suggested_attributes([1, 2])",
+            )
+
+        # Warn about non-errors
+        warnings = [i for i in config_issues if i.startswith("WARNING")]
+        for w in warnings:
+            logger.warning(w)
+
+    def _compute_descriptive_statistics(self) -> dict:
+        """Compute descriptive statistics for the cohort."""
+        from faircareai.metrics.descriptive import compute_cohort_summary
+
+        return compute_cohort_summary(
+            df=self.df,
+            y_true_col=self.target_col,
+            y_prob_col=self.pred_col,
+            sensitive_attrs={
+                a.name: {"column": a.column, "reference": a.reference}
+                for a in self.sensitive_attributes
+            },
+        )
+
+    def _compute_overall_performance(
+        self,
+        bootstrap_ci: bool,
+        n_bootstrap: int,
+    ) -> dict:
+        """Compute overall performance metrics."""
+        from faircareai.metrics.performance import compute_overall_performance
+
+        y_true = self.df[self.target_col].to_numpy()
+        y_prob = self.df[self.pred_col].to_numpy()
+
+        return compute_overall_performance(
+            y_true=y_true,
+            y_prob=y_prob,
+            threshold=self.threshold,
+            bootstrap_ci=bootstrap_ci,
+            n_bootstrap=n_bootstrap,
+        )
+
+    def _compute_subgroup_performance(
+        self,
+        bootstrap_ci: bool,
+        n_bootstrap: int,
+    ) -> dict:
+        """Compute subgroup performance metrics."""
+        from faircareai.metrics.subgroup import compute_subgroup_metrics
+
+        results = {}
+        for attr in self.sensitive_attributes:
+            results[attr.name] = compute_subgroup_metrics(
+                df=self.df,
+                y_prob_col=self.pred_col,
+                y_true_col=self.target_col,
+                group_col=attr.column,
+                threshold=self.threshold,
+                reference=attr.reference,
+                bootstrap_ci=bootstrap_ci,
+                n_bootstrap=n_bootstrap,
+            )
+        return results
+
+    def _compute_fairness_metrics(self) -> dict:
+        """Compute fairness metrics for each sensitive attribute."""
+        from faircareai.metrics.fairness import compute_fairness_metrics
+
+        results = {}
+        for attr in self.sensitive_attributes:
+            results[attr.name] = compute_fairness_metrics(
+                df=self.df,
+                y_prob_col=self.pred_col,
+                y_true_col=self.target_col,
+                group_col=attr.column,
+                threshold=self.threshold,
+                reference=attr.reference,
+            )
+        return results
+
     def run(
         self,
         bootstrap_ci: bool = True,
@@ -634,90 +736,15 @@ class FairCareAudit:
             >>> # Or equivalently:
             >>> results.to_pdf("governance.pdf", persona="governance")
         """
-        # Validate config
-        config_issues = self.config.validate()
-        errors = [i for i in config_issues if i.startswith("ERROR")]
-        if errors:
-            raise ConfigurationError(
-                "fairness_config",
-                "Configuration errors:\n" + "\n".join(errors) + "\n\n"
-                "Use audit.suggest_fairness_metric() for recommendations, then set:\n"
-                "  config.primary_fairness_metric = FairnessMetric.EQUALIZED_ODDS\n"
-                "  config.fairness_justification = 'Your justification here'",
-            )
-
-        if not self.sensitive_attributes:
-            raise ConfigurationError(
-                "sensitive_attributes",
-                "At least one sensitive attribute required.\n"
-                "Use audit.suggest_attributes() to see suggestions, then:\n"
-                "  audit.accept_suggested_attributes([1, 2])",
-            )
-
-        # Warn about non-errors
-        warnings = [i for i in config_issues if i.startswith("WARNING")]
-        for w in warnings:
-            logger.warning(w)
+        self._validate_audit_config()
 
         results = AuditResults(config=self.config, threshold=self.threshold)
 
-        # Section 1: Descriptive Statistics
-        from faircareai.metrics.descriptive import compute_cohort_summary
-
-        # Build sensitive attributes dict for metrics functions
-        results.descriptive_stats = compute_cohort_summary(
-            df=self.df,
-            y_true_col=self.target_col,
-            y_prob_col=self.pred_col,
-            sensitive_attrs={
-                a.name: {"column": a.column, "reference": a.reference}
-                for a in self.sensitive_attributes
-            },
-        )
-
-        # Section 2: Overall Performance
-        from faircareai.metrics.performance import compute_overall_performance
-
-        y_true = self.df[self.target_col].to_numpy()
-        y_prob = self.df[self.pred_col].to_numpy()
-
-        results.overall_performance = compute_overall_performance(
-            y_true=y_true,
-            y_prob=y_prob,
-            threshold=self.threshold,
-            bootstrap_ci=bootstrap_ci,
-            n_bootstrap=n_bootstrap,
-        )
-
-        # Section 3: Subgroup Performance
-        from faircareai.metrics.subgroup import compute_subgroup_metrics
-
-        results.subgroup_performance = {}
-        for attr in self.sensitive_attributes:
-            results.subgroup_performance[attr.name] = compute_subgroup_metrics(
-                df=self.df,
-                y_prob_col=self.pred_col,
-                y_true_col=self.target_col,
-                group_col=attr.column,
-                threshold=self.threshold,
-                reference=attr.reference,
-                bootstrap_ci=bootstrap_ci,
-                n_bootstrap=n_bootstrap,
-            )
-
-        # Section 4: Fairness Metrics
-        from faircareai.metrics.fairness import compute_fairness_metrics
-
-        results.fairness_metrics = {}
-        for attr in self.sensitive_attributes:
-            results.fairness_metrics[attr.name] = compute_fairness_metrics(
-                df=self.df,
-                y_prob_col=self.pred_col,
-                y_true_col=self.target_col,
-                group_col=attr.column,
-                threshold=self.threshold,
-                reference=attr.reference,
-            )
+        # Section 1-4: Computation
+        results.descriptive_stats = self._compute_descriptive_statistics()
+        results.overall_performance = self._compute_overall_performance(bootstrap_ci, n_bootstrap)
+        results.subgroup_performance = self._compute_subgroup_performance(bootstrap_ci, n_bootstrap)
+        results.fairness_metrics = self._compute_fairness_metrics()
 
         # Section 5: Intersectional Analysis
         from faircareai.metrics.subgroup import compute_intersectional
@@ -753,6 +780,42 @@ class FairCareAudit:
             if attr.name == name:
                 return attr.column
         raise ConfigurationError("attribute_name", f"Attribute not found: {name}")
+
+    def _build_flag(
+        self,
+        severity: str,
+        category: str,
+        message: str,
+        details: str,
+        chai_criteria: str | None = None,
+        **kwargs: Any,
+    ) -> dict:
+        """Build a standardized flag dictionary.
+
+        Centralizes flag construction to ensure consistent structure
+        across all flag-generating methods.
+
+        Args:
+            severity: Flag severity level ("error", "warning", "info").
+            category: Category of the flag (e.g., "sample_size", "fairness").
+            message: Short summary message for the flag.
+            details: Detailed explanation of the issue.
+            chai_criteria: Optional CHAI criteria reference (e.g., "AC1.CR82").
+            **kwargs: Additional context fields (attribute, group, metric, value, threshold).
+
+        Returns:
+            Standardized flag dictionary.
+        """
+        flag = {
+            "severity": severity,
+            "category": category,
+            "message": message,
+            "details": details,
+            **kwargs,
+        }
+        if chai_criteria:
+            flag["chai_criteria"] = chai_criteria
+        return flag
 
     def _generate_flags(self, results: AuditResults) -> list[dict]:
         """Generate warning/error flags based on thresholds.
@@ -793,18 +856,18 @@ class FairCareAudit:
                 n = metrics.get("n", 0)
                 if n < min_n:
                     flags.append(
-                        {
-                            "severity": "warning",
-                            "category": "sample_size",
-                            "attribute": attr_name,
-                            "group": group,
-                            "message": f"Subgroup n={n} < {min_n}",
-                            "details": (
+                        self._build_flag(
+                            severity="warning",
+                            category="sample_size",
+                            message=f"Subgroup n={n} < {min_n}",
+                            details=(
                                 f"Small sample size may lead to unstable estimates "
                                 f"for {attr_name}:{group}"
                             ),
-                            "chai_criteria": "AC1.CR82",
-                        }
+                            chai_criteria="AC1.CR82",
+                            attribute=attr_name,
+                            group=group,
+                        )
                     )
 
         return flags
@@ -829,24 +892,24 @@ class FairCareAudit:
                 for group, ratio in dp_ratios.items():
                     if ratio is not None and (ratio < dp_range[0] or ratio > dp_range[1]):
                         flags.append(
-                            {
-                                "severity": "warning",
-                                "category": "fairness",
-                                "metric": "demographic_parity",
-                                "attribute": attr_name,
-                                "group": group,
-                                "value": ratio,
-                                "threshold": dp_range,
-                                "message": (
+                            self._build_flag(
+                                severity="warning",
+                                category="fairness",
+                                message=(
                                     f"Demographic parity ratio {ratio:.2f} "
                                     f"outside [{dp_range[0]}, {dp_range[1]}]"
                                 ),
-                                "details": (
+                                details=(
                                     f"Selection rates differ significantly between "
                                     f"{group} and reference"
                                 ),
-                                "chai_criteria": "AC1.CR92",
-                            }
+                                chai_criteria="AC1.CR92",
+                                metric="demographic_parity",
+                                attribute=attr_name,
+                                group=group,
+                                value=ratio,
+                                threshold=dp_range,
+                            )
                         )
 
             # Equalized odds (TPR/FPR parity)
@@ -855,20 +918,20 @@ class FairCareAudit:
                 for group, diff in eo_diffs.items():
                     if diff is not None and abs(diff) > eo_threshold:
                         flags.append(
-                            {
-                                "severity": "warning",
-                                "category": "fairness",
-                                "metric": "equalized_odds",
-                                "attribute": attr_name,
-                                "group": group,
-                                "value": diff,
-                                "threshold": eo_threshold,
-                                "message": f"Equalized odds difference {diff:.3f} > {eo_threshold}",
-                                "details": (
+                            self._build_flag(
+                                severity="warning",
+                                category="fairness",
+                                message=f"Equalized odds difference {diff:.3f} > {eo_threshold}",
+                                details=(
                                     f"TPR/FPR differs significantly between {group} and reference"
                                 ),
-                                "chai_criteria": "AC1.CR92",
-                            }
+                                chai_criteria="AC1.CR92",
+                                metric="equalized_odds",
+                                attribute=attr_name,
+                                group=group,
+                                value=diff,
+                                threshold=eo_threshold,
+                            )
                         )
 
         return flags
@@ -890,18 +953,18 @@ class FairCareAudit:
             missing_rate = attr_dist.get("pct_missing", 0)
             if missing_rate > max_missing:
                 flags.append(
-                    {
-                        "severity": "warning",
-                        "category": "data_quality",
-                        "attribute": attr_name,
-                        "value": missing_rate,
-                        "threshold": max_missing,
-                        "message": f"Missing rate {missing_rate:.1%} > {max_missing:.0%}",
-                        "details": (
+                    self._build_flag(
+                        severity="warning",
+                        category="data_quality",
+                        message=f"Missing rate {missing_rate:.1%} > {max_missing:.0%}",
+                        details=(
                             f"High missing data for {attr_name} may bias fairness estimates"
                         ),
-                        "chai_criteria": "AC1.CR68",
-                    }
+                        chai_criteria="AC1.CR68",
+                        attribute=attr_name,
+                        value=missing_rate,
+                        threshold=max_missing,
+                    )
                 )
 
         return flags
