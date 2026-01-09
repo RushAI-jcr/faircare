@@ -124,9 +124,9 @@ def compute_ace(
         bin_edges = np.percentile(y_prob, quantiles)
         # Remove duplicate edges (happens when many predictions are identical)
         bin_edges = np.unique(bin_edges)
-    except (ValueError, IndexError) as e:
-        # Handle edge cases: empty array, all identical values, etc.
-        logger.debug("Quantile binning failed: %s. Using fallback.", e)
+    except ValueError as e:
+        # Handle edge cases: all identical values creating invalid percentiles
+        logger.debug(f"Quantile binning failed: {e}. Using fallback.")
         return (np.nan, 0)
 
     # Assign samples to bins

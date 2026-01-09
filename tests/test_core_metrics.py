@@ -4,7 +4,7 @@ Tests for FairCareAI core metrics module.
 Tests cover:
 - GroupMetrics dataclass
 - _compute_confusion_matrix function
-- _safe_divide function
+- safe_divide function (from validation module)
 - compute_metrics_for_group function
 - compute_metric_ci function
 - compute_group_metrics function
@@ -16,11 +16,11 @@ import pytest
 from faircareai.core.metrics import (
     GroupMetrics,
     _compute_confusion_matrix,
-    _safe_divide,
     compute_group_metrics,
     compute_metric_ci,
     compute_metrics_for_group,
 )
+from faircareai.core.validation import safe_divide
 
 
 class TestGroupMetrics:
@@ -133,36 +133,36 @@ class TestComputeConfusionMatrix:
 
 
 class TestSafeDivide:
-    """Tests for _safe_divide function."""
+    """Tests for safe_divide function (from validation module)."""
 
     def test_normal_division(self) -> None:
         """Test normal division."""
-        result = _safe_divide(10, 5)
+        result = safe_divide(10, 5)
         assert result == 2.0
 
     def test_zero_denominator_default(self) -> None:
         """Test zero denominator returns default."""
-        result = _safe_divide(10, 0)
+        result = safe_divide(10, 0)
         assert result == 0.0
 
     def test_zero_denominator_custom(self) -> None:
         """Test zero denominator with custom default."""
-        result = _safe_divide(10, 0, default=1.0)
+        result = safe_divide(10, 0, default=1.0)
         assert result == 1.0
 
     def test_zero_numerator(self) -> None:
         """Test zero numerator."""
-        result = _safe_divide(0, 10)
+        result = safe_divide(0, 10)
         assert result == 0.0
 
     def test_both_zero(self) -> None:
         """Test both numerator and denominator zero."""
-        result = _safe_divide(0, 0)
+        result = safe_divide(0, 0)
         assert result == 0.0
 
     def test_float_result(self) -> None:
         """Test division producing float."""
-        result = _safe_divide(1, 3)
+        result = safe_divide(1, 3)
         assert abs(result - 0.333) < 0.01
 
 

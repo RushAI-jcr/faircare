@@ -37,6 +37,7 @@ from faircareai.core.constants import (
 )
 from faircareai.core.logging import get_logger
 from faircareai.core.types import DisparityIndexResult, FairnessResult
+from faircareai.core.validation import safe_divide
 
 logger = get_logger(__name__)
 
@@ -111,19 +112,19 @@ def compute_fairness_metrics(
             }
             continue
 
-        # Basic rates
-        selection_rate = (tp + fp) / n if n > 0 else 0.0
-        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
-        ppv = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        npv = tn / (tn + fn) if (tn + fn) > 0 else 0.0
-        prevalence = (tp + fn) / n if n > 0 else 0.0
+        # Basic rates using centralized safe_divide
+        selection_rate = safe_divide(tp + fp, n)
+        tpr = safe_divide(tp, tp + fn)
+        fpr = safe_divide(fp, fp + tn)
+        ppv = safe_divide(tp, tp + fp)
+        npv = safe_divide(tn, tn + fn)
+        prevalence = safe_divide(tp + fn, n)
 
         # Mean predicted probability
         mean_prob = float(np.mean(y_prob))
 
         # Calibration (difference between mean predicted and observed rate)
-        observed_rate = (tp + fn) / n if n > 0 else 0.0
+        observed_rate = safe_divide(tp + fn, n)
         predicted_rate = mean_prob
         mean_calibration_error = predicted_rate - observed_rate
 

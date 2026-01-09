@@ -21,6 +21,7 @@ from faircareai.core.statistical import (
     get_sample_warning,
 )
 from faircareai.core.statistics import ci_wilson
+from faircareai.core.validation import safe_divide
 
 
 @dataclass
@@ -57,11 +58,6 @@ def _compute_confusion_matrix(
     tn = int(((y_true == 0) & (y_pred == 0)).sum())
     fn = int(((y_true == 1) & (y_pred == 0)).sum())
     return tp, fp, tn, fn
-
-
-def _safe_divide(numerator: int, denominator: int, default: float = 0.0) -> float:
-    """Safe division with default for zero denominator."""
-    return numerator / denominator if denominator > 0 else default
 
 
 def compute_confusion_metrics(
@@ -152,13 +148,13 @@ def compute_metrics_for_group(
     tp, fp, tn, fn = _compute_confusion_matrix(y_true, y_pred)
 
     # Compute rates
-    tpr = _safe_divide(tp, tp + fn)  # Sensitivity
-    fpr = _safe_divide(fp, fp + tn)
-    tnr = _safe_divide(tn, tn + fp)  # Specificity
-    fnr = _safe_divide(fn, fn + tp)
-    ppv = _safe_divide(tp, tp + fp)  # Precision
-    npv = _safe_divide(tn, tn + fn)
-    accuracy = _safe_divide(tp + tn, n)
+    tpr = safe_divide(tp, tp + fn)  # Sensitivity
+    fpr = safe_divide(fp, fp + tn)
+    tnr = safe_divide(tn, tn + fp)  # Specificity
+    fnr = safe_divide(fn, fn + tp)
+    ppv = safe_divide(tp, tp + fp)  # Precision
+    npv = safe_divide(tn, tn + fn)
+    accuracy = safe_divide(tp + tn, n)
 
     # Determine CI method based on proportions
     ci_method = "wilson"
