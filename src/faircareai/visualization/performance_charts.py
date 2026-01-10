@@ -230,18 +230,6 @@ def plot_discrimination_curves(
         legend=LEGEND_POSITIONS["bottom_horizontal"],
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
-
-    # Add annotation
-    fig.add_annotation(
-        text=GOVERNANCE_DISCLAIMER_SHORT,
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=-0.42,  # Moved down for better spacing below legend
-        showarrow=False,
-        font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
-    )
-
     return fig
 
 
@@ -367,18 +355,6 @@ def plot_calibration_curve(
         yaxis=dict(range=[0, 1], tickformat=".0%"),
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
-
-    # Disclaimer
-    fig.add_annotation(
-        text=GOVERNANCE_DISCLAIMER_SHORT,
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=-0.28,  # Moved down to avoid overlap with axis title
-        showarrow=False,
-        font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
-    )
-
     return fig
 
 
@@ -673,18 +649,6 @@ def plot_decision_curve(
         bordercolor=FAIRCAREAI_COLORS["gray"],
         borderwidth=1,
     )
-
-    # Disclaimer
-    fig.add_annotation(
-        text=GOVERNANCE_DISCLAIMER_SHORT,
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=-0.25,  # Consistent spacing below chart
-        showarrow=False,
-        font=dict(size=14, color=FAIRCAREAI_COLORS["gray"]),
-    )
-
     return fig
 
 

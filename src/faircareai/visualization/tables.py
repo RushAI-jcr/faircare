@@ -58,17 +58,17 @@ def create_plain_language_summary(
     Uses neutral terminology for threshold-based results.
     """
     if flag_count > 0:
-        status = "REVIEW SUGGESTED"
+        status = "THRESHOLD EXCEEDED"
         color = SEMANTIC_COLORS["fail"]
-        advisory = "Disparities flagged for clinical review"
+        advisory = "Some metrics exceed configured thresholds"
     elif warn_count > 0:
-        status = "CONSIDERATIONS NOTED"
+        status = "NEAR THRESHOLD"
         color = SEMANTIC_COLORS["warn"]
-        advisory = "Some metrics may warrant discussion"
+        advisory = "Some metrics are approaching thresholds"
     else:
-        status = "NO FLAGS"
+        status = "WITHIN THRESHOLDS"
         color = SEMANTIC_COLORS["pass"]
-        advisory = "No significant disparities detected at current thresholds"
+        advisory = "All metrics within configured thresholds"
 
     return f"""
     <div style="font-family: {TYPOGRAPHY["data_font"]}; padding: 24px;">
@@ -80,7 +80,7 @@ def create_plain_language_summary(
         <p>Largest disparity: <b>{worst_metric}</b> for <b>{worst_group}</b>
            ({abs(worst_value) * 100:.1f}% difference from reference)</p>
         <p style="font-size: 16px; color: #888; font-style: italic;">
-            Advisory guidance — final deployment decisions rest with clinical stakeholders
+            Data provided for governance team review — final decisions made by health system governance committee
         </p>
     </div>
     """

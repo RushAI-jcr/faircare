@@ -59,37 +59,17 @@ def add_source_annotation(
 ) -> go.Figure:
     """Add FairCareAI source annotation to a figure.
 
-    Adds a source annotation at the bottom of the figure. Optionally includes
-    a methodology citation (e.g., for Van Calster plots).
+    NOTE: Source annotations have been moved to HTML report containers to avoid
+    Plotly clipping issues. This function now returns the figure unchanged.
+    Source attributions are rendered in the HTML report footer.
 
     Args:
         fig: Plotly Figure object.
-        source_note: Custom source note (uses brand default if None).
-        citation: Optional methodology citation to append.
+        source_note: Deprecated - no longer used.
+        citation: Deprecated - no longer used.
 
     Returns:
-        Figure with source annotation added.
-
-    Example:
-        >>> fig = go.Figure()
-        >>> add_source_annotation(fig, citation="Van Calster et al. (2025)")
+        Figure unchanged (annotations handled in HTML).
     """
-    effective_source = source_note if source_note is not None else FAIRCAREAI_BRAND["source_note"]
-
-    # Add citation if provided
-    if citation:
-        annotation_text = f"{effective_source} | Methodology: {citation}"
-    else:
-        annotation_text = effective_source
-
-    fig.add_annotation(
-        text=annotation_text,
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=-0.18,  # Moved down to avoid overlap with rotated x-axis labels
-        showarrow=False,
-        font={"size": TYPOGRAPHY["source_size"], "color": EDITORIAL_COLORS["slate"]},
-        xanchor="left",
-    )
+    # Source annotations moved to HTML report footer to prevent clipping
     return fig
