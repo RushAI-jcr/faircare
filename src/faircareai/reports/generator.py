@@ -1977,7 +1977,7 @@ def _generate_governance_html(results: "AuditResults") -> str:
             margin-top: 20px;
         }}
 
-        /* NYTimes-style Hero Section */
+        /* Editorial-style Hero Section */
         .hero-section {{
             background: {hero_color};
             color: white;
@@ -2073,7 +2073,7 @@ def _generate_governance_html(results: "AuditResults") -> str:
             </p>
         </div>
 
-        <!-- Hero Section (NYTimes style) -->
+        <!-- Hero Section (editorial style) -->
         <div class="hero-section">
             <div class="hero-number">{auroc_value:.0%}</div>
             <div class="hero-title">Model Discrimination Score</div>

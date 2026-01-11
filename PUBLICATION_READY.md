@@ -112,7 +112,7 @@ Major enhancements:
 - Decision Curve Analysis (clinical utility)
 - ROC curves and probability distributions
 - 18 rendering fixes (no text cutoff)
-- Beautiful NYTimes-style governance reports
+- Beautiful editorial-style governance reports
 - Scientific publication-ready data scientist reports
 
 Full Van Calster compliance per:
