@@ -411,7 +411,7 @@ results.to_png("figures_ds.zip", persona="data_scientist", include_optional=True
 FairCareAI aligns governance artifacts with the CHAI Applied Model Card template and RAIC Checkpoint 1 checklist:
 - [CHAI Applied Model Card documentation](https://mc.chai.org/v0.1/documentation.pdf)
 - [CHAI Applied Model Card schema](https://github.com/coalition-for-health-ai/mc-schema)
-- [CHAI RAIC Checkpoint 1 checklist](https://www.chai.org/wp-content/uploads/2024/12/CHAI-RAIC-Checkpoint-1-FINAL.pdf)
+- [CHAI RAIC Checkpoint 1 checklist](https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf)
 
 ---
 

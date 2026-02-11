@@ -53,7 +53,7 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         [
             ("Name", model_overview.get("name")),
             ("Developer", model_overview.get("developer")),
-            ("Inquiries", model_overview.get("inquiries")),
+            ("Inquiries or report issue", model_overview.get("inquiries_or_report_issue")),
             ("Release stage", model_overview.get("release_stage")),
             ("Release date", model_overview.get("release_date")),
             ("Version", model_overview.get("version")),
@@ -64,15 +64,15 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         ],
     )
 
-    intended_use = card.get("intended_use", {})
+    uses = card.get("uses_and_directions", {})
     lines += _section_lines(
         "Uses and Directions",
         [
-            ("Intended use and workflow", intended_use.get("intended_use_and_workflow")),
-            ("Primary intended users", intended_use.get("primary_intended_users")),
-            ("How to use", intended_use.get("how_to_use")),
-            ("Targeted patient population", intended_use.get("targeted_patient_population")),
-            ("Out of scope settings", intended_use.get("out_of_scope_settings")),
+            ("Intended use and workflow", uses.get("intended_use_and_workflow")),
+            ("Primary intended users", uses.get("primary_intended_users")),
+            ("How to use", uses.get("how_to_use")),
+            ("Targeted patient population", uses.get("targeted_patient_population")),
+            ("Cautioned out-of-scope settings", uses.get("cautioned_out_of_scope_settings")),
         ],
     )
 
@@ -80,28 +80,33 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
     lines += _section_lines(
         "Warnings",
         [
-            ("Risks and limitations", warnings.get("risks_and_limitations")),
-            ("Biases and ethical considerations", warnings.get("biases_and_ethical_considerations")),
+            ("Known risks and limitations", warnings.get("known_risks_and_limitations")),
+            (
+                "Known biases or ethical considerations",
+                warnings.get("known_biases_or_ethical_considerations"),
+            ),
             ("Clinical risk level", warnings.get("clinical_risk_level")),
         ],
     )
 
     trust = card.get("trust_ingredients", {})
+    ai_facts = trust.get("ai_system_facts", {})
     lines += _section_lines(
         "Trust Ingredients",
         [
-            ("AI system facts", trust.get("ai_system_facts")),
-            ("Model type", trust.get("model_type")),
-            ("Use case type", trust.get("use_case_type")),
-            ("Input data", trust.get("input_data")),
-            ("Outputs", trust.get("outputs")),
-            ("Development data", trust.get("development_data")),
-            ("Evaluation data", trust.get("evaluation_data")),
-            ("Foundation models", trust.get("foundation_models")),
-            ("Bias mitigation", trust.get("bias_mitigation")),
-            ("Ongoing maintenance", trust.get("ongoing_maintenance")),
-            ("Security and compliance", trust.get("security_and_compliance")),
-            ("Transparency mechanisms", trust.get("transparency_mechanisms")),
+            ("Outcomes and outputs", ai_facts.get("outcomes_and_outputs")),
+            ("Model type", ai_facts.get("model_type")),
+            ("Foundation models used", ai_facts.get("foundation_models_used")),
+            ("Input data source", ai_facts.get("input_data_source")),
+            ("Output/Input data type", ai_facts.get("output_input_data_type")),
+            ("Development data characterization", ai_facts.get("development_data_characterization")),
+            ("Bias mitigation approaches", ai_facts.get("bias_mitigation_approaches")),
+            ("Ongoing maintenance", ai_facts.get("ongoing_maintenance")),
+            ("Security and compliance environment", ai_facts.get("security_and_compliance_environment")),
+            (
+                "Transparency mechanisms",
+                ai_facts.get("transparency_intelligibility_accountability_mechanisms"),
+            ),
         ],
     )
 
@@ -109,9 +114,15 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
     lines += _section_lines(
         "Transparency Information",
         [
-            ("Funding source", transparency.get("funding_source")),
-            ("Third-party information", transparency.get("third_party_info")),
-            ("Stakeholders consulted", transparency.get("stakeholders_consulted")),
+            (
+                "Funding source of technical implementation",
+                transparency.get("funding_source_of_technical_implementation"),
+            ),
+            ("Third-party information", transparency.get("third_party_information")),
+            (
+                "Stakeholders consulted during design",
+                transparency.get("stakeholders_consulted_during_design"),
+            ),
         ],
     )
 
@@ -119,14 +130,18 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
     lines.append("## Key Metrics")
     for section, metrics in key_metrics.items():
         lines.append(f"### {section.replace('_', ' ').title()}")
-        if isinstance(metrics, list):
-            for metric in metrics:
-                if isinstance(metric, dict):
-                    name = metric.get("name", "Metric")
-                    value = _format_value(metric.get("value"))
-                    lines.append(f"- **{name}**: {value}")
-                else:
-                    lines.append(f"- {metric}")
+        if isinstance(metrics, dict):
+            lines.append(f"- **Goal of metrics**: {_format_value(metrics.get('goal_of_metrics'))}")
+            lines.append(f"- **Result**: {_format_value(metrics.get('result'))}")
+            lines.append(f"- **Interpretation**: {_format_value(metrics.get('interpretation'))}")
+            lines.append(f"- **Test type**: {_format_value(metrics.get('test_type'))}")
+            lines.append(
+                f"- **Testing data description**: {_format_value(metrics.get('testing_data_description'))}"
+            )
+            lines.append(
+                "- **Validation process and justification**: "
+                f"{_format_value(metrics.get('validation_process_and_justification'))}"
+            )
         else:
             lines.append(f"- {_format_value(metrics)}")
         lines.append("")
@@ -137,10 +152,13 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         [
             ("Evaluation references", resources.get("evaluation_references")),
             ("Clinical trials", resources.get("clinical_trials")),
-            ("Publications", resources.get("publications")),
+            ("Peer reviewed publications", resources.get("peer_reviewed_publications")),
             ("Reimbursement status", resources.get("reimbursement_status")),
-            ("Patient consent / disclosure", resources.get("patient_consent")),
-            ("Stakeholders consulted", resources.get("stakeholders_consulted")),
+            ("Patient consent or disclosure", resources.get("patient_consent_or_disclosure")),
+            (
+                "Stakeholders consulted during design",
+                resources.get("stakeholders_consulted_during_design"),
+            ),
         ],
     )
 

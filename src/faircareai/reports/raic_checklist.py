@@ -110,7 +110,7 @@ def generate_raic_checkpoint_1_checklist(results: AuditResults, path: str | Path
     checklist = {
         "raic_checkpoint": "Checkpoint 1",
         "source_url": "https://www.chai.org/workgroup/responsible-ai/responsible-ai-checklists-raic",
-        "documentation_url": "https://www.chai.org/wp-content/uploads/2024/12/CHAI-RAIC-Checkpoint-1-FINAL.pdf",
+        "documentation_url": "https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf",
         "generated_at": now,
         "audit_id": results.audit_id,
         "model_name": results.config.model_name,
