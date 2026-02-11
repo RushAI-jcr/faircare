@@ -126,11 +126,21 @@ def dashboard(port: int, host: str) -> None:
     "--format",
     "output_format",
     type=click.Choice(
-        ["html", "pdf", "pptx", "json", "png", "model-card", "repro-bundle"],
+        [
+            "html",
+            "pdf",
+            "pptx",
+            "json",
+            "png",
+            "model-card",
+            "chai-model-card",
+            "raic-checklist",
+            "repro-bundle",
+        ],
         case_sensitive=False,
     ),
     help=(
-        "Output format (html, pdf, pptx, json, png, model-card, repro-bundle). "
+        "Output format (html, pdf, pptx, json, png, model-card, chai-model-card, raic-checklist, repro-bundle). "
         "Overrides file suffix if provided."
     ),
 )
@@ -304,6 +314,8 @@ def audit(
 
         if fmt == "model-card":
             fmt_ext = "md"
+        elif fmt in {"chai-model-card", "raic-checklist"}:
+            fmt_ext = "json"
         elif fmt == "png":
             fmt_ext = "zip"
         elif fmt == "repro-bundle":
@@ -362,6 +374,10 @@ def audit(
                 )
             elif fmt == "model-card":
                 results.to_model_card(str(output_path))
+            elif fmt == "chai-model-card":
+                results.to_chai_model_card(str(output_path))
+            elif fmt == "raic-checklist":
+                results.to_raic_checkpoint_1(str(output_path))
             elif fmt == "repro-bundle":
                 results.to_reproducibility_bundle(str(output_path))
             else:

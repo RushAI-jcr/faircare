@@ -349,6 +349,8 @@ def render_export_section(result: Any) -> None:
         base_name = model_name.model_name if model_name is not None else "faircareai_report"
         if fmt == "model-card":
             suffix = "md"
+        elif fmt in {"chai-model-card", "raic-checklist"}:
+            suffix = "json"
         elif fmt == "png":
             suffix = "zip"
         elif fmt == "repro-bundle":
@@ -373,6 +375,12 @@ def render_export_section(result: Any) -> None:
                 return out_path.read_bytes(), filename
             if fmt == "model-card":
                 result.to_model_card(str(out_path))
+                return out_path.read_bytes(), filename
+            if fmt == "chai-model-card":
+                result.to_chai_model_card(str(out_path))
+                return out_path.read_bytes(), filename
+            if fmt == "raic-checklist":
+                result.to_raic_checkpoint_1(str(out_path))
                 return out_path.read_bytes(), filename
             if fmt == "repro-bundle":
                 result.to_reproducibility_bundle(str(out_path))
@@ -462,6 +470,32 @@ def render_export_section(result: Any) -> None:
                 )
             except Exception as e:
                 st.error(f"Model card export failed: {e}")
+
+        if st.button("Download CHAI Model Card (JSON)", use_container_width=True):
+            try:
+                json_bytes, filename = _build_report_bytes("chai-model-card")
+                st.download_button(
+                    label="Download CHAI Model Card",
+                    data=json_bytes,
+                    file_name=filename,
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"CHAI model card export failed: {e}")
+
+        if st.button("Download RAIC Checklist (JSON)", use_container_width=True):
+            try:
+                json_bytes, filename = _build_report_bytes("raic-checklist")
+                st.download_button(
+                    label="Download RAIC Checklist",
+                    data=json_bytes,
+                    file_name=filename,
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"RAIC checklist export failed: {e}")
 
         if st.button("Download PNG Bundle", use_container_width=True):
             try:

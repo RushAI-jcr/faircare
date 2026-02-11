@@ -1,127 +1,158 @@
-"""Model card generator for FairCareAI audits."""
+"""Model card generator for FairCareAI audits (CHAI Applied Model Card aligned)."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 from faircareai.core.results import AuditResults
+from faircareai.reports.chai_model_card import build_chai_model_card
 
 
-def _fmt_pct(value: float | None) -> str:
+def _format_value(value: object) -> str:
     if value is None:
-        return "N/A"
-    return f"{value * 100:.1f}%"
+        return "Not specified"
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value) if value else "Not specified"
+    if isinstance(value, dict):
+        return "See structured section"
+    return str(value)
 
 
-def _fmt_num(value: float | int | None) -> str:
-    if value is None:
-        return "N/A"
-    try:
-        return f"{value:,}"
-    except Exception:
-        return str(value)
+def _section_lines(title: str, rows: list[tuple[str, object]]) -> list[str]:
+    lines = [f"## {title}"]
+    for label, value in rows:
+        lines.append(f"- **{label}**: {_format_value(value)}")
+    lines.append("")
+    return lines
 
 
 def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Path:
-    """Generate a governance-focused model card (Markdown)."""
+    """Generate a CHAI Applied Model Card-aligned Markdown report."""
     path = Path(path)
+    card = build_chai_model_card(results)
 
-    desc = results.descriptive_stats.get("cohort_overview", {})
-    perf = results.overall_performance
-    disc = perf.get("discrimination", {})
-    cal = perf.get("calibration", {})
-    cls = perf.get("classification_at_threshold", {})
-    gov = results.governance_recommendation or {}
+    lines: list[str] = ["# CHAI Applied Model Card (FairCareAI)", ""]
 
-    model_name = results.config.model_name
-    model_version = results.config.model_version
-    intended_use = results.config.intended_use or "Not specified"
-    intended_population = results.config.intended_population or "Not specified"
-    out_of_scope = (
-        ", ".join(results.config.out_of_scope) if results.config.out_of_scope else "Not specified"
+    lines += _section_lines(
+        "Schema Alignment",
+        [
+            ("Schema version", card.get("schema_version")),
+            ("Schema URL", card.get("schema_url")),
+            ("Template URL", card.get("template_url")),
+            ("Generated at", card.get("generated_at")),
+            ("Audit ID", card.get("audit_id")),
+            ("Run timestamp", card.get("run_timestamp")),
+        ],
     )
-    primary_metric = (
-        results.config.primary_fairness_metric.value
-        if results.config.primary_fairness_metric
-        else "Not specified"
+
+    model_overview = card.get("model_overview", {})
+    lines += _section_lines(
+        "Model Overview",
+        [
+            ("Name", model_overview.get("name")),
+            ("Developer", model_overview.get("developer")),
+            ("Inquiries", model_overview.get("inquiries")),
+            ("Release stage", model_overview.get("release_stage")),
+            ("Release date", model_overview.get("release_date")),
+            ("Version", model_overview.get("version")),
+            ("Global availability", model_overview.get("global_availability")),
+            ("Regulatory approval", model_overview.get("regulatory_approval")),
+            ("Summary", model_overview.get("summary")),
+            ("Keywords", model_overview.get("keywords")),
+        ],
     )
-    fairness_justification = results.config.fairness_justification or "Not specified"
-    thresholds = results.config.thresholds or {}
-    flags = results.flags or []
-    n_flags = len(flags)
-    n_errors = len([f for f in flags if f.get("severity") == "error"])
-    n_warnings = len([f for f in flags if f.get("severity") == "warning"])
-    n_groups = 0
-    for _attr, metrics in results.subgroup_performance.items():
-        if isinstance(metrics, dict):
-            groups = metrics.get("groups", {})
-            n_groups += len([k for k in groups if k not in ("reference", "attribute", "threshold")])
 
-    lines = [
-        "# FairCareAI Model Card",
-        "",
-        "## Model Overview",
-        f"- **Model name**: {model_name}",
-        f"- **Model version**: {model_version}",
-        f"- **Audit ID**: {results.audit_id}",
-        f"- **Audit run timestamp**: {results.run_timestamp or 'N/A'}",
-        f"- **Report generated**: {datetime.now().astimezone().isoformat(timespec='seconds')}",
-        "",
-        "## Intended Use",
-        f"- **Intended use**: {intended_use}",
-        f"- **Intended population**: {intended_population}",
-        f"- **Out of scope**: {out_of_scope}",
-        "",
-        "## Data Summary",
-        f"- **Samples (n)**: {_fmt_num(desc.get('n_total'))}",
-        f"- **Outcome prevalence**: {desc.get('prevalence_pct', 'N/A')}",
-        f"- **Sensitive attributes**: {', '.join(results.fairness_metrics.keys()) or 'Not specified'}",
-        f"- **Subgroups evaluated**: {_fmt_num(n_groups)}",
-        "",
-        "## Performance Summary",
-        f"- **AUROC**: {disc.get('auroc', 'N/A')}",
-        f"- **AUPRC**: {disc.get('auprc', 'N/A')}",
-        f"- **Brier score**: {cal.get('brier_score', 'N/A')}",
-        f"- **Calibration slope**: {cal.get('calibration_slope', 'N/A')}",
-        f"- **Sensitivity (TPR)**: {_fmt_pct(cls.get('sensitivity'))}",
-        f"- **Specificity**: {_fmt_pct(cls.get('specificity'))}",
-        f"- **PPV**: {_fmt_pct(cls.get('ppv'))}",
-        "",
-        "## Fairness Summary",
-        f"- **Primary fairness metric**: {primary_metric}",
-        f"- **Justification**: {fairness_justification}",
-        f"- **Decision threshold**: {results.threshold:.2f}",
-        f"- **Governance status**: {gov.get('status', 'N/A')}",
-        f"- **Advisory**: {gov.get('advisory', 'N/A')}",
-        f"- **Flags**: {n_flags} total ({n_errors} error, {n_warnings} warning)",
-        "",
-        "## CHAI RAIC Alignment",
-        "- **AC1.CR92-93**: Primary fairness metric selected with documented justification.",
-        "- **AC1.CR95**: Subgroup performance assessed for protected attributes.",
-        "- **AC1.CR1-4**: Model identity, intended use, and scope documented.",
-        "",
-        "## Thresholds & Policy Settings",
-        f"- **Minimum subgroup n**: {thresholds.get('min_subgroup_n', 'N/A')}",
-        f"- **Demographic parity ratio**: {thresholds.get('demographic_parity_ratio', 'N/A')}",
-        f"- **Equalized odds diff**: {thresholds.get('equalized_odds_diff', 'N/A')}",
-        f"- **Calibration diff**: {thresholds.get('calibration_diff', 'N/A')}",
-        f"- **Minimum AUROC**: {thresholds.get('min_auroc', 'N/A')}",
-        f"- **Max missing rate**: {thresholds.get('max_missing_rate', 'N/A')}",
-        "",
-        "## Reproducibility",
-        f"- **Random seed**: {results.random_seed if results.random_seed is not None else 'N/A'}",
-        "",
-        "## Governance Sign-off",
-        "- **Reviewer name**: _______________________________",
-        "- **Role/Title**: _______________________________",
-        "- **Review date**: _______________________________",
-        "- **Decision**: ☐ Approve ☐ Conditional ☐ Reject",
-        "- **Comments**:",
-        "",
-        "## Notes",
-        "This model card is generated by FairCareAI and is intended to support governance review.",
-    ]
+    intended_use = card.get("intended_use", {})
+    lines += _section_lines(
+        "Uses and Directions",
+        [
+            ("Intended use and workflow", intended_use.get("intended_use_and_workflow")),
+            ("Primary intended users", intended_use.get("primary_intended_users")),
+            ("How to use", intended_use.get("how_to_use")),
+            ("Targeted patient population", intended_use.get("targeted_patient_population")),
+            ("Out of scope settings", intended_use.get("out_of_scope_settings")),
+        ],
+    )
 
-    path.write_text("\n".join(lines), encoding="utf-8")
+    warnings = card.get("warnings", {})
+    lines += _section_lines(
+        "Warnings",
+        [
+            ("Risks and limitations", warnings.get("risks_and_limitations")),
+            ("Biases and ethical considerations", warnings.get("biases_and_ethical_considerations")),
+            ("Clinical risk level", warnings.get("clinical_risk_level")),
+        ],
+    )
+
+    trust = card.get("trust_ingredients", {})
+    lines += _section_lines(
+        "Trust Ingredients",
+        [
+            ("AI system facts", trust.get("ai_system_facts")),
+            ("Model type", trust.get("model_type")),
+            ("Use case type", trust.get("use_case_type")),
+            ("Input data", trust.get("input_data")),
+            ("Outputs", trust.get("outputs")),
+            ("Development data", trust.get("development_data")),
+            ("Evaluation data", trust.get("evaluation_data")),
+            ("Foundation models", trust.get("foundation_models")),
+            ("Bias mitigation", trust.get("bias_mitigation")),
+            ("Ongoing maintenance", trust.get("ongoing_maintenance")),
+            ("Security and compliance", trust.get("security_and_compliance")),
+            ("Transparency mechanisms", trust.get("transparency_mechanisms")),
+        ],
+    )
+
+    transparency = card.get("transparency_information", {})
+    lines += _section_lines(
+        "Transparency Information",
+        [
+            ("Funding source", transparency.get("funding_source")),
+            ("Third-party information", transparency.get("third_party_info")),
+            ("Stakeholders consulted", transparency.get("stakeholders_consulted")),
+        ],
+    )
+
+    key_metrics = card.get("key_metrics", {})
+    lines.append("## Key Metrics")
+    for section, metrics in key_metrics.items():
+        lines.append(f"### {section.replace('_', ' ').title()}")
+        if isinstance(metrics, list):
+            for metric in metrics:
+                if isinstance(metric, dict):
+                    name = metric.get("name", "Metric")
+                    value = _format_value(metric.get("value"))
+                    lines.append(f"- **{name}**: {value}")
+                else:
+                    lines.append(f"- {metric}")
+        else:
+            lines.append(f"- {_format_value(metrics)}")
+        lines.append("")
+
+    resources = card.get("resources", {})
+    lines += _section_lines(
+        "Resources",
+        [
+            ("Evaluation references", resources.get("evaluation_references")),
+            ("Clinical trials", resources.get("clinical_trials")),
+            ("Publications", resources.get("publications")),
+            ("Reimbursement status", resources.get("reimbursement_status")),
+            ("Patient consent / disclosure", resources.get("patient_consent")),
+            ("Stakeholders consulted", resources.get("stakeholders_consulted")),
+        ],
+    )
+
+    governance = card.get("governance", {})
+    lines += _section_lines(
+        "Governance",
+        [
+            ("Status", governance.get("status")),
+            ("Advisory", governance.get("advisory")),
+            ("Review notes", governance.get("review_notes")),
+        ],
+    )
+
+    path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
     return path

@@ -17,6 +17,7 @@ based on Van Calster Table 2 recommendations:
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 from faircareai.core.constants import (
     VANCALSTER_ALL_CAUTION,
@@ -689,6 +690,8 @@ class FairnessConfig:
     include_chai_mapping: bool = True
     organization_name: str = ""
     report_date: str | None = None
+    model_card: dict[str, Any] = field(default_factory=dict)
+    """Optional overrides for CHAI Applied Model Card fields."""
 
     def validate(self) -> list[str]:
         """Validate config and return list of warnings/errors.

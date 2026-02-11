@@ -607,6 +607,18 @@ class AuditResults:
 
         return generate_model_card_markdown(self, path)
 
+    def to_chai_model_card(self, path: str | Path) -> Path:
+        """Export a CHAI Applied Model Card-aligned JSON file."""
+        from faircareai.reports.chai_model_card import generate_chai_model_card_json
+
+        return generate_chai_model_card_json(self, path)
+
+    def to_raic_checkpoint_1(self, path: str | Path) -> Path:
+        """Export a RAIC Checkpoint 1 checklist JSON file."""
+        from faircareai.reports.raic_checklist import generate_raic_checkpoint_1_checklist
+
+        return generate_raic_checkpoint_1_checklist(self, path)
+
     def to_png(
         self,
         path: str | Path,
