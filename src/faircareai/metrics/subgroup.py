@@ -15,6 +15,7 @@ import numpy as np
 import polars as pl
 from sklearn.metrics import roc_auc_score
 
+from faircareai.core.constants import DEFAULT_BOOTSTRAP_SEED
 from faircareai.core.metrics import compute_confusion_metrics
 from faircareai.metrics.group_utils import (
     determine_reference_group,
@@ -32,6 +33,7 @@ def compute_subgroup_metrics(
     reference: str | None = None,
     bootstrap_ci: bool = True,
     n_bootstrap: int = 500,
+    random_seed: int | None = DEFAULT_BOOTSTRAP_SEED,
 ) -> dict[str, Any]:
     """Compute comprehensive metrics for each subgroup.
 
@@ -44,6 +46,7 @@ def compute_subgroup_metrics(
         reference: Reference group for comparisons.
         bootstrap_ci: Whether to compute bootstrap CI.
         n_bootstrap: Number of bootstrap iterations.
+        random_seed: Random seed for bootstrap resampling.
 
     Returns:
         Dict with per-subgroup performance and fairness metrics.
@@ -115,7 +118,7 @@ def compute_subgroup_metrics(
 
             # Bootstrap CI for AUROC
             if bootstrap_ci and n >= 20:
-                auroc_samples = _bootstrap_auroc(y_true, y_prob, n_bootstrap)
+                auroc_samples = _bootstrap_auroc(y_true, y_prob, n_bootstrap, random_seed)
                 if len(auroc_samples) > 10:
                     auroc_ci = np.percentile(auroc_samples, [2.5, 97.5])
                     group_result["auroc_ci_95"] = [float(auroc_ci[0]), float(auroc_ci[1])]
@@ -135,6 +138,7 @@ def _bootstrap_auroc(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     n_bootstrap: int,
+    random_seed: int | None = None,
 ) -> list[float]:
     """Bootstrap AUROC samples.
 
@@ -143,12 +147,13 @@ def _bootstrap_auroc(
     """
     from faircareai.core.bootstrap import bootstrap_metric
 
+    seed = DEFAULT_BOOTSTRAP_SEED if random_seed is None else random_seed
     samples, _ = bootstrap_metric(
         y_true,
         y_prob,
         lambda yt, yp: roc_auc_score(yt, yp),
         n_bootstrap=n_bootstrap,
-        seed=42,
+        seed=seed,
         min_classes=2,
     )
     return samples

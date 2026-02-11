@@ -64,6 +64,8 @@ audit.config = FairnessConfig(
 # 5. Run and export
 results = audit.run()
 results.to_html("report.html")
+results.to_model_card("model_card.md")
+results.to_reproducibility_bundle("reproducibility.json")
 ```
 
 ---
@@ -118,6 +120,10 @@ results.to_governance_pdf("gov_report.pdf")
 
 # PowerPoint (always governance-focused)
 results.to_pptx("presentation.pptx")
+
+# Model card + reproducibility bundle
+results.to_model_card("model_card.md")
+results.to_reproducibility_bundle("reproducibility.json")
 ```
 
 ### Comparison
@@ -598,7 +604,24 @@ to_json(path: str | Path) -> Path
 
 Export metrics as JSON.
 
-JSON includes `audit_metadata` with `audit_id` and `run_timestamp`.
+JSON includes `audit_metadata` with `audit_id`, `run_timestamp`, and `random_seed`,
+plus a `reproducibility` bundle with environment metadata.
+
+##### to_reproducibility_bundle()
+
+```python
+to_reproducibility_bundle(path: str | Path) -> Path
+```
+
+Export environment + run metadata for reproducibility.
+
+##### to_model_card()
+
+```python
+to_model_card(path: str | Path) -> Path
+```
+
+Export a governance-focused model card (Markdown).
 
 #### Other Methods
 
@@ -743,10 +766,11 @@ faircareai audit DATA_PATH [OPTIONS]
 |--------|-------------|---------|
 | `-p`, `--pred-col` | Prediction column name (required) | `-p risk_score` |
 | `-t`, `--target-col` | Target/outcome column name (required) | `-t readmit_30d` |
-| `-a`, `--attribute` | Sensitive attribute (repeatable) | `-a race -a sex` |
+| `-a`, `--attributes` | Sensitive attribute (repeatable) | `-a race -a sex` |
 | `-o`, `--output` | Output file path | `-o report.html` |
-| `--format` | Output format (html, pdf, json) | `--format pdf` |
+| `--format` | Output format (html, pdf, pptx, json, model-card) | `--format pdf` |
 | `--persona` | Output persona (data_scientist, governance) | `--persona governance` |
+| `--seed` | Random seed for bootstrap | `--seed 42` |
 | `--threshold` | Decision threshold (0-1) | `--threshold 0.3` |
 | `--model-name` | Model display name | `--model-name "Risk v2"` |
 

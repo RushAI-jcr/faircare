@@ -6,6 +6,9 @@ Designed for clinical stakeholders and governance committees.
 """
 
 from datetime import datetime
+from pathlib import Path
+import re
+import tempfile
 from typing import Any
 
 import polars as pl
@@ -332,49 +335,120 @@ def render_export_section(result: Any) -> None:
     Generate a formal governance report for your records.
     """)
 
+    def _safe_filename(base: str, suffix: str) -> str:
+        clean = re.sub(r"[^a-zA-Z0-9_-]+", "_", base.strip()).strip("_")
+        if not clean:
+            clean = "faircareai_report"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        return f"{clean}_{timestamp}.{suffix}"
+
+    def _build_report_bytes(fmt: str) -> tuple[bytes, str]:
+        from faircareai.core.config import OutputPersona
+
+        model_name = getattr(result, "config", None)
+        base_name = model_name.model_name if model_name is not None else "faircareai_report"
+        suffix = "md" if fmt == "model-card" else fmt
+        filename = _safe_filename(base_name, suffix)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = Path(tmpdir) / filename
+            if fmt == "html":
+                result.to_html(str(out_path), persona=OutputPersona.GOVERNANCE)
+                return out_path.read_bytes(), filename
+            if fmt == "pdf":
+                result.to_pdf(str(out_path), persona=OutputPersona.GOVERNANCE)
+                return out_path.read_bytes(), filename
+            if fmt == "pptx":
+                result.to_pptx(str(out_path))
+                return out_path.read_bytes(), filename
+            if fmt == "json":
+                result.to_json(str(out_path))
+                return out_path.read_bytes(), filename
+            if fmt == "model-card":
+                result.to_model_card(str(out_path))
+                return out_path.read_bytes(), filename
+        raise RuntimeError("Failed to generate report")
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
         if st.button("Generate HTML Report", use_container_width=True):
             try:
-                import faircareai.reports.generator  # noqa: F401
-
-                # Would generate actual report here
-                st.info("HTML report generation is available via the API")
-            except ImportError:
-                st.info("Install report dependencies: pip install faircareai[reports]")
+                with st.spinner("Generating HTML report..."):
+                    html_bytes, filename = _build_report_bytes("html")
+                st.download_button(
+                    label="Download HTML",
+                    data=html_bytes,
+                    file_name=filename,
+                    mime="text/html",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"HTML export failed: {e}")
 
     with col2:
         if st.button("Generate PDF Report", use_container_width=True):
-            st.info("PDF export available via CLI: `faircareai export --format pdf`")
+            try:
+                with st.spinner("Generating PDF report..."):
+                    pdf_bytes, filename = _build_report_bytes("pdf")
+                st.download_button(
+                    label="Download PDF",
+                    data=pdf_bytes,
+                    file_name=filename,
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except ImportError:
+                st.info(
+                    'Install export dependencies: `pip install "faircareai[export]"` '
+                    "and `python -m playwright install chromium`."
+                )
+            except Exception as e:
+                st.error(f"PDF export failed: {e}")
 
     with col3:
+        if st.button("Generate PPTX Deck", use_container_width=True):
+            try:
+                with st.spinner("Generating PowerPoint deck..."):
+                    pptx_bytes, filename = _build_report_bytes("pptx")
+                st.download_button(
+                    label="Download PPTX",
+                    data=pptx_bytes,
+                    file_name=filename,
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                )
+            except ImportError:
+                st.info('Install export dependencies: `pip install "faircareai[export]"`.')
+            except Exception as e:
+                st.error(f"PPTX export failed: {e}")
+
+        st.markdown("---")
         if st.button("Download JSON Data", use_container_width=True):
-            # Export as JSON
-            import json
+            try:
+                json_bytes, filename = _build_report_bytes("json")
+                st.download_button(
+                    label="Download JSON",
+                    data=json_bytes,
+                    file_name=filename,
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"JSON export failed: {e}")
 
-            export_data = {
-                "model_name": result.model_name
-                if hasattr(result, "model_name")
-                else "Uploaded Model",
-                "audit_date": datetime.now().isoformat(),
-                "n_samples": result.n_samples,
-                "threshold": result.threshold,
-                "pass_count": result.pass_count,
-                "warn_count": result.warn_count,
-                "fail_count": result.fail_count,
-                "metrics": result.metrics_df.to_dicts(),
-                "disparities": result.disparities_df.to_dicts()
-                if len(result.disparities_df) > 0
-                else [],
-            }
-
-            st.download_button(
-                label="Download JSON",
-                data=json.dumps(export_data, indent=2, default=str),
-                file_name="faircareai_audit_results.json",
-                mime="application/json",
-            )
+        if st.button("Download Model Card (MD)", use_container_width=True):
+            try:
+                md_bytes, filename = _build_report_bytes("model-card")
+                st.download_button(
+                    label="Download Model Card",
+                    data=md_bytes,
+                    file_name=filename,
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"Model card export failed: {e}")
 
 
 def render_governance_page() -> None:

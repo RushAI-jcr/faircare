@@ -57,6 +57,7 @@ from faircareai.core.constants import (
     BRIER_POOR_THRESHOLD,
     CALIBRATION_SLOPE_OVERFITTING,
     CALIBRATION_SLOPE_UNDERFITTING,
+    DEFAULT_BOOTSTRAP_SEED,
     PROB_CLIP_MAX,
     PROB_CLIP_MIN,
 )
@@ -79,6 +80,7 @@ def compute_overall_performance(
     thresholds_to_evaluate: list[float] | None = None,
     bootstrap_ci: bool = True,
     n_bootstrap: int = 1000,
+    random_seed: int | None = DEFAULT_BOOTSTRAP_SEED,
 ) -> OverallPerformance:
     """Compute comprehensive model performance metrics.
 
@@ -89,6 +91,7 @@ def compute_overall_performance(
         thresholds_to_evaluate: List of thresholds for sensitivity analysis.
         bootstrap_ci: Whether to compute bootstrap confidence intervals.
         n_bootstrap: Number of bootstrap iterations.
+        random_seed: Random seed for bootstrap resampling.
 
     Returns:
         Dict containing:
@@ -109,7 +112,7 @@ def compute_overall_performance(
 
     # === Discrimination Metrics ===
     results["discrimination"] = compute_discrimination_metrics(
-        y_true, y_prob, bootstrap_ci, n_bootstrap
+        y_true, y_prob, bootstrap_ci, n_bootstrap, random_seed
     )
 
     # === Calibration Metrics ===
@@ -117,7 +120,7 @@ def compute_overall_performance(
 
     # === Classification at Threshold ===
     results["classification_at_threshold"] = compute_classification_at_threshold(
-        y_true, y_prob, threshold, bootstrap_ci, n_bootstrap
+        y_true, y_prob, threshold, bootstrap_ci, n_bootstrap, random_seed
     )
 
     # === Threshold Analysis ===
@@ -141,6 +144,7 @@ def compute_discrimination_metrics(
     y_prob: np.ndarray,
     bootstrap_ci: bool = True,
     n_bootstrap: int = 1000,
+    random_seed: int | None = DEFAULT_BOOTSTRAP_SEED,
 ) -> DiscriminationMetrics:
     """Compute discrimination metrics with confidence intervals.
 
@@ -149,6 +153,7 @@ def compute_discrimination_metrics(
         y_prob: Predicted probabilities.
         bootstrap_ci: Whether to compute bootstrap CI.
         n_bootstrap: Number of bootstrap iterations.
+        random_seed: Random seed for bootstrap resampling.
 
     Returns:
         Dict with AUROC, AUPRC, AP, and curve data.
@@ -185,13 +190,14 @@ def compute_discrimination_metrics(
 
     # Bootstrap confidence intervals using centralized bootstrap module
     if bootstrap_ci and len(y_true) > 10:
+        seed = DEFAULT_BOOTSTRAP_SEED if random_seed is None else random_seed
         # AUROC bootstrap (stratified=False for backward compatibility)
         auroc_samples, _ = bootstrap_metric(
             y_true,
             y_prob,
             lambda yt, yp: roc_auc_score(yt, yp),
             n_bootstrap=n_bootstrap,
-            seed=42,
+            seed=seed,
             stratified=False,
         )
 
@@ -205,7 +211,7 @@ def compute_discrimination_metrics(
             y_prob,
             _auprc_metric,
             n_bootstrap=n_bootstrap,
-            seed=42,
+            seed=seed,
             stratified=False,
         )
 
@@ -376,6 +382,7 @@ def compute_classification_at_threshold(
     threshold: float,
     bootstrap_ci: bool = True,
     n_bootstrap: int = 1000,
+    random_seed: int | None = DEFAULT_BOOTSTRAP_SEED,
 ) -> ClassificationMetrics:
     """Compute classification metrics at a specific threshold.
 
@@ -385,6 +392,7 @@ def compute_classification_at_threshold(
         threshold: Decision threshold.
         bootstrap_ci: Whether to compute bootstrap CI.
         n_bootstrap: Number of bootstrap iterations.
+        random_seed: Random seed for bootstrap resampling.
 
     Returns:
         Dict with sensitivity, specificity, PPV, NPV, F1, accuracy,
@@ -460,13 +468,14 @@ def compute_classification_at_threshold(
 
     # Bootstrap CI for key metrics using centralized bootstrap module
     if bootstrap_ci and len(y_true) > 10:
+        seed = DEFAULT_BOOTSTRAP_SEED if random_seed is None else random_seed
         # Use bootstrap_confusion_metrics for sens/spec/ppv CIs
         ci_results = bootstrap_confusion_metrics(
             y_true,
             y_prob,
             threshold=threshold,
             n_bootstrap=n_bootstrap,
-            seed=42,
+            seed=seed,
             stratified=False,  # Backward compatibility
         )
 
@@ -627,6 +636,7 @@ def compute_subgroup_performance(
     reference: str | None = None,
     bootstrap_ci: bool = True,
     n_bootstrap: int = 500,
+    random_seed: int | None = DEFAULT_BOOTSTRAP_SEED,
 ) -> dict[str, Any]:
     """Compute performance metrics for each subgroup.
 
@@ -639,6 +649,7 @@ def compute_subgroup_performance(
         reference: Reference group for comparisons.
         bootstrap_ci: Whether to compute bootstrap CI.
         n_bootstrap: Number of bootstrap iterations.
+        random_seed: Random seed for bootstrap resampling.
 
     Returns:
         Dict with per-group performance metrics.
@@ -705,7 +716,8 @@ def compute_subgroup_performance(
         # Bootstrap CI for AUROC if requested
         if bootstrap_ci and auroc is not None and len(y_true) >= 20:
             auroc_samples = []
-            rng = np.random.default_rng(42)
+            seed = DEFAULT_BOOTSTRAP_SEED if random_seed is None else random_seed
+            rng = np.random.default_rng(seed)
             n = len(y_true)
 
             for _ in range(n_bootstrap):

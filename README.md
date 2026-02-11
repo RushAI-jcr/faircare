@@ -44,6 +44,7 @@ FairCareAI is a Python package for auditing machine learning models for fairness
 - **Publication-Ready Typography**: Minimum 14px fonts
 - **Accessibility-First Design**: WCAG 2.1 AA compliant, colorblind-safe palettes
 - **Multiple Export Formats**: HTML dashboards, PDF reports, PowerPoint decks
+- **Model Card + Reproducibility Bundle**: Governance-ready summary and environment capture
 - **HIPAA-Friendly**: All computation runs locally, no cloud dependencies
 - **TRIPOD+AI Compliant**: Scientifically validated performance metrics
 
@@ -388,6 +389,10 @@ results.to_pdf("governance.pdf", persona="governance")
 
 # PowerPoint (always governance-focused)
 results.to_pptx("governance_deck.pptx")
+
+# Model card + reproducibility bundle
+results.to_model_card("model_card.md")
+results.to_reproducibility_bundle("reproducibility.json")
 ```
 
 ---
@@ -881,10 +886,11 @@ faircareai audit predictions.parquet -p risk_score -t outcome --threshold 0.3
 |--------|-------------|---------|
 | `-p`, `--pred-col` | Prediction column name | `-p risk_score` |
 | `-t`, `--target-col` | Target/outcome column name | `-t readmit_30d` |
-| `-a`, `--attribute` | Sensitive attribute (repeatable) | `-a race -a sex` |
+| `-a`, `--attributes` | Sensitive attribute (repeatable) | `-a race -a sex` |
 | `-o`, `--output` | Output file path | `-o report.html` |
-| `--format` | Output format (html, pdf, json) | `--format pdf` |
+| `--format` | Output format (html, pdf, pptx, json, model-card) | `--format pdf` |
 | `--persona` | Output persona (data_scientist, governance) | `--persona governance` |
+| `--seed` | Random seed for bootstrap | `--seed 42` |
 | `--threshold` | Decision threshold (0-1) | `--threshold 0.3` |
 
 ### Streamlit Dashboard
@@ -903,12 +909,11 @@ faircareai dashboard
 ```
 
 **Dashboard Features**:
-- Upload data via file or connect to database
+- Upload data via CSV/Parquet file
 - Interactive attribute selection
 - Real-time visualization updates
 - Threshold adjustment sliders
 - Export reports directly from UI
-- Side-by-side persona comparison
 
 ---
 

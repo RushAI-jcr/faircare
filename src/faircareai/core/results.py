@@ -55,6 +55,8 @@ class AuditResults:
     # Audit metadata
     audit_id: str = field(default_factory=lambda: str(uuid4()))
     run_timestamp: str | None = None
+    random_seed: int | None = None
+    reproducibility: dict = field(default_factory=dict)
 
     # Results - IN ORDER OF REPORT SECTIONS
     # Section 1: Descriptive Statistics (Table 1)
@@ -514,7 +516,9 @@ class AuditResults:
             "audit_metadata": {
                 "audit_id": self.audit_id,
                 "run_timestamp": self.run_timestamp,
+                "random_seed": self.random_seed,
             },
+            "reproducibility": self.reproducibility,
             "config": {
                 "model_name": self.config.model_name,
                 "model_version": self.config.model_version,
@@ -542,6 +546,50 @@ class AuditResults:
             json.dump(export_data, f, indent=2, default=str)
 
         return path
+
+    def to_reproducibility_bundle(self, path: str | Path) -> Path:
+        """Export reproducibility bundle (environment + run metadata).
+
+        Args:
+            path: Output file path.
+
+        Returns:
+            Path to generated JSON file.
+        """
+        path = Path(path)
+
+        export_data = {
+            "audit_metadata": {
+                "audit_id": self.audit_id,
+                "run_timestamp": self.run_timestamp,
+                "random_seed": self.random_seed,
+            },
+            "reproducibility": self.reproducibility,
+            "config": {
+                "model_name": self.config.model_name,
+                "model_version": self.config.model_version,
+                "primary_fairness_metric": (
+                    self.config.primary_fairness_metric.value
+                    if self.config.primary_fairness_metric
+                    else None
+                ),
+                "fairness_justification": self.config.fairness_justification,
+                "use_case_type": (
+                    self.config.use_case_type.value if self.config.use_case_type else None
+                ),
+            },
+        }
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(export_data, f, indent=2, default=str)
+
+        return path
+
+    def to_model_card(self, path: str | Path) -> Path:
+        """Export a governance-focused model card (Markdown)."""
+        from faircareai.reports.model_card import generate_model_card_markdown
+
+        return generate_model_card_markdown(self, path)
 
     def _to_audit_summary(self) -> "AuditSummary":
         """Convert to legacy AuditSummary for report generator compatibility."""

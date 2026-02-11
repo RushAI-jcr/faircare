@@ -20,12 +20,14 @@ from faircareai.core.config import (
     FairnessConfig,
     SensitiveAttribute,
 )
+from faircareai.core.constants import DEFAULT_BOOTSTRAP_SEED
 from faircareai.core.exceptions import (
     ConfigurationError,
     DataValidationError,
 )
 from faircareai.core.logging import get_logger
 from faircareai.core.results import AuditResults
+from faircareai.core.reproducibility import build_reproducibility_bundle
 from faircareai.data.sensitive_attrs import (
     display_suggestions,
     get_reference_group,
@@ -638,6 +640,7 @@ class FairCareAudit:
         self,
         bootstrap_ci: bool,
         n_bootstrap: int,
+        random_seed: int | None,
     ) -> dict:
         """Compute overall performance metrics."""
         from faircareai.metrics.performance import compute_overall_performance
@@ -651,12 +654,14 @@ class FairCareAudit:
             threshold=self.threshold,
             bootstrap_ci=bootstrap_ci,
             n_bootstrap=n_bootstrap,
+            random_seed=random_seed,
         )
 
     def _compute_subgroup_performance(
         self,
         bootstrap_ci: bool,
         n_bootstrap: int,
+        random_seed: int | None,
     ) -> dict:
         """Compute subgroup performance metrics."""
         from faircareai.metrics.subgroup import compute_subgroup_metrics
@@ -672,6 +677,7 @@ class FairCareAudit:
                 reference=attr.reference,
                 bootstrap_ci=bootstrap_ci,
                 n_bootstrap=n_bootstrap,
+                random_seed=random_seed,
             )
         return results
 
@@ -695,6 +701,7 @@ class FairCareAudit:
         self,
         bootstrap_ci: bool = True,
         n_bootstrap: int = 1000,
+        random_seed: int | None = DEFAULT_BOOTSTRAP_SEED,
     ) -> AuditResults:
         """
         Execute the fairness audit.
@@ -710,6 +717,8 @@ class FairCareAudit:
             n_bootstrap: Number of bootstrap iterations for confidence
                 intervals. Higher values increase precision but take longer.
                 Default: 1000.
+            random_seed: Random seed for bootstrap and stochastic steps to
+                ensure reproducible results. Default: 42.
 
         Returns:
             AuditResults object containing all computed metrics and methods for:
@@ -741,11 +750,21 @@ class FairCareAudit:
 
         results = AuditResults(config=self.config, threshold=self.threshold)
         results.run_timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        results.random_seed = random_seed
+        results.reproducibility = build_reproducibility_bundle(
+            bootstrap_ci=bootstrap_ci,
+            n_bootstrap=n_bootstrap,
+            random_seed=random_seed,
+        )
 
         # Section 1-4: Computation
         results.descriptive_stats = self._compute_descriptive_statistics()
-        results.overall_performance = self._compute_overall_performance(bootstrap_ci, n_bootstrap)
-        results.subgroup_performance = self._compute_subgroup_performance(bootstrap_ci, n_bootstrap)
+        results.overall_performance = self._compute_overall_performance(
+            bootstrap_ci, n_bootstrap, random_seed
+        )
+        results.subgroup_performance = self._compute_subgroup_performance(
+            bootstrap_ci, n_bootstrap, random_seed
+        )
         results.fairness_metrics = self._compute_fairness_metrics()
 
         # Section 5: Intersectional Analysis

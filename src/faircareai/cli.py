@@ -120,12 +120,32 @@ def dashboard(port: int, host: str) -> None:
     "--output",
     "-o",
     type=click.Path(path_type=Path),
-    help="Output file path (supports .html, .pdf, .pptx)",
+    help="Output file path (supports .html, .pdf, .pptx, .json, .md)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["html", "pdf", "pptx", "json", "model-card"], case_sensitive=False),
+    help="Output format (html, pdf, pptx, json, model-card). Overrides file suffix if provided.",
+)
+@click.option(
+    "--persona",
+    type=click.Choice(["data_scientist", "governance"], case_sensitive=False),
+    default="data_scientist",
+    show_default=True,
+    help="Output persona for reports.",
 )
 @click.option(
     "--threshold",
     default=0.5,
     help="Decision threshold for binary classification (default: 0.5)",
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Random seed for bootstrap resampling",
 )
 @click.option(
     "--model-name",
@@ -143,9 +163,12 @@ def audit(
     pred_col: str,
     target_col: str,
     output: Path | None,
+    output_format: str | None,
     threshold: float,
+    seed: int | None,
     model_name: str,
     attributes: tuple[str, ...],
+    persona: str,
 ) -> None:
     """Run a fairness audit on model predictions.
 
@@ -230,7 +253,7 @@ def audit(
     # Run audit
     console.print("\n[bold]Running fairness audit...[/bold]")
     try:
-        results = audit_obj.run()
+        results = audit_obj.run(random_seed=seed)
     except (DataValidationError, ConfigurationError, MetricComputationError) as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
@@ -261,23 +284,53 @@ def audit(
         )
     )
 
-    # Export if output specified
-    if output:
-        output_path = Path(output)
+    # Export if output specified or format explicitly requested
+    if output or output_format:
+        fmt = output_format.lower() if output_format else None
+        output_path = Path(output) if output else None
+
+        fmt_ext = "md" if fmt == "model-card" else fmt
+
+        # Default output path if format provided without output
+        if output_path is None and fmt:
+            output_path = Path(f"faircareai_report.{fmt_ext}")
+
+        # Normalize suffix to match format when provided
+        if fmt and output_path is not None:
+            if output_path.suffix.lower() != f".{fmt_ext}":
+                output_path = output_path.with_suffix(f".{fmt_ext}")
+
+        # Infer format from suffix if not explicitly provided
+        if fmt is None and output_path is not None:
+            inferred = output_path.suffix.lstrip(".").lower()
+            fmt = "model-card" if inferred in {"md", "markdown"} else inferred
+
         console.print(f"\n[bold]Exporting to {output_path}...[/bold]")
 
         try:
-            if output_path.suffix == ".html":
-                results.to_html(str(output_path))
-            elif output_path.suffix == ".pdf":
-                results.to_pdf(str(output_path))
-            elif output_path.suffix == ".pptx":
-                results.to_pptx(str(output_path))
+            from faircareai.core.config import OutputPersona
+
+            persona_enum = (
+                OutputPersona.GOVERNANCE
+                if persona.lower() == OutputPersona.GOVERNANCE.value
+                else OutputPersona.DATA_SCIENTIST
+            )
+
+            if fmt == "html":
+                results.to_html(str(output_path), persona=persona_enum)
+            elif fmt == "pdf":
+                results.to_pdf(str(output_path), persona=persona_enum)
+            elif fmt == "pptx":
+                results.to_pptx(str(output_path), persona=persona_enum)
+            elif fmt == "json":
+                results.to_json(str(output_path))
+            elif fmt == "model-card":
+                results.to_model_card(str(output_path))
             else:
                 console.print(
-                    f"[yellow]Unknown format {output_path.suffix}, defaulting to HTML[/yellow]"
+                    f"[yellow]Unknown format {fmt}, defaulting to HTML[/yellow]"
                 )
-                results.to_html(str(output_path.with_suffix(".html")))
+                results.to_html(str(output_path.with_suffix(".html")), persona=persona_enum)
 
             console.print(f"  [green]Saved to {output_path}[/green]")
         except (DataValidationError, ConfigurationError, MetricComputationError) as e:

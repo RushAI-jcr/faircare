@@ -198,6 +198,38 @@ def _build_audit_trail_rows(
         ]
     )
 
+    # Reproducibility details
+    repro = results.reproducibility if results is not None else {}
+    env = repro.get("environment", {}) if isinstance(repro, dict) else {}
+    packages = env.get("packages", {}) if isinstance(env, dict) else {}
+    python_info = env.get("python", {}) if isinstance(env, dict) else {}
+    platform_info = env.get("platform", {}) if isinstance(env, dict) else {}
+
+    def _fmt_packages(keys: list[str]) -> str:
+        entries = [f"{k} {packages[k]}" for k in keys if k in packages]
+        return ", ".join(entries) if entries else "N/A"
+
+    random_seed = None
+    if results is not None:
+        random_seed = results.random_seed
+    if random_seed is None and isinstance(repro, dict):
+        random_seed = repro.get("random_seed")
+
+    if random_seed is not None:
+        rows.append(("Random seed", str(random_seed)))
+
+    if python_info:
+        python_version = python_info.get("version") or "N/A"
+        rows.append(("Python", python_version))
+
+    if platform_info:
+        system = platform_info.get("system") or "N/A"
+        release = platform_info.get("release") or ""
+        rows.append(("OS", f"{system} {release}".strip()))
+
+    key_packages = ["numpy", "polars", "scikit-learn", "statsmodels", "plotly"]
+    rows.append(("Key packages", _fmt_packages(key_packages)))
+
     return rows
 
 
