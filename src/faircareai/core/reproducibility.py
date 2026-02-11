@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import platform
 import sys
+import os
 from importlib import metadata
 
 
@@ -36,6 +37,8 @@ def capture_environment() -> dict:
         "python-pptx",
     ]
     versions = {pkg: _package_version(pkg) for pkg in packages}
+    faircareai_version = versions.get("faircareai")
+    git_sha = os.getenv("FAIRCAREAI_GIT_SHA") or os.getenv("GIT_SHA")
 
     return {
         "python": {
@@ -49,6 +52,8 @@ def capture_environment() -> dict:
             "version": platform.version(),
             "machine": platform.machine(),
         },
+        "faircareai_version": faircareai_version,
+        "git_sha": git_sha,
         "packages": {k: v for k, v in versions.items() if v is not None},
     }
 

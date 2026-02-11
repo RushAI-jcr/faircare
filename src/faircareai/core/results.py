@@ -577,6 +577,11 @@ class AuditResults:
                 "use_case_type": (
                     self.config.use_case_type.value if self.config.use_case_type else None
                 ),
+                "thresholds": self.config.thresholds,
+                "decision_thresholds": self.config.decision_thresholds,
+            },
+            "run_parameters": {
+                "threshold": self.threshold,
             },
         }
 

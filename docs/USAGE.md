@@ -768,7 +768,7 @@ faircareai audit DATA_PATH [OPTIONS]
 | `-t`, `--target-col` | Target/outcome column name (required) | `-t readmit_30d` |
 | `-a`, `--attributes` | Sensitive attribute (repeatable) | `-a race -a sex` |
 | `-o`, `--output` | Output file path | `-o report.html` |
-| `--format` | Output format (html, pdf, pptx, json, model-card) | `--format pdf` |
+| `--format` | Output format (html, pdf, pptx, json, model-card, repro-bundle) | `--format pdf` |
 | `--persona` | Output persona (data_scientist, governance) | `--persona governance` |
 | `--seed` | Random seed for bootstrap | `--seed 42` |
 | `--threshold` | Decision threshold (0-1) | `--threshold 0.3` |
@@ -785,6 +785,9 @@ faircareai audit patient_data.csv -p risk_score -t readmit_30d -a race -a sex
 
 # Generate governance PDF report from CSV
 faircareai audit data.csv -p risk_score -t outcome --persona governance --format pdf -o governance.pdf
+
+# Export reproducibility bundle
+faircareai audit data.csv -p risk_score -t outcome --format repro-bundle -o reproducibility.json
 
 # Full example with all options
 faircareai audit predictions.parquet \

@@ -46,6 +46,17 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         if results.config.primary_fairness_metric
         else "Not specified"
     )
+    fairness_justification = results.config.fairness_justification or "Not specified"
+    thresholds = results.config.thresholds or {}
+    flags = results.flags or []
+    n_flags = len(flags)
+    n_errors = len([f for f in flags if f.get("severity") == "error"])
+    n_warnings = len([f for f in flags if f.get("severity") == "warning"])
+    n_groups = 0
+    for _attr, metrics in results.subgroup_performance.items():
+        if isinstance(metrics, dict):
+            groups = metrics.get("groups", {})
+            n_groups += len([k for k in groups if k not in ("reference", "attribute", "threshold")])
 
     lines = [
         "# FairCareAI Model Card",
@@ -66,6 +77,7 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         f"- **Samples (n)**: {_fmt_num(desc.get('n_total'))}",
         f"- **Outcome prevalence**: {desc.get('prevalence_pct', 'N/A')}",
         f"- **Sensitive attributes**: {', '.join(results.fairness_metrics.keys()) or 'Not specified'}",
+        f"- **Subgroups evaluated**: {_fmt_num(n_groups)}",
         "",
         "## Performance Summary",
         f"- **AUROC**: {disc.get('auroc', 'N/A')}",
@@ -78,9 +90,24 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         "",
         "## Fairness Summary",
         f"- **Primary fairness metric**: {primary_metric}",
+        f"- **Justification**: {fairness_justification}",
         f"- **Decision threshold**: {results.threshold:.2f}",
         f"- **Governance status**: {gov.get('status', 'N/A')}",
         f"- **Advisory**: {gov.get('advisory', 'N/A')}",
+        f"- **Flags**: {n_flags} total ({n_errors} error, {n_warnings} warning)",
+        "",
+        "## CHAI RAIC Alignment",
+        "- **AC1.CR92-93**: Primary fairness metric selected with documented justification.",
+        "- **AC1.CR95**: Subgroup performance assessed for protected attributes.",
+        "- **AC1.CR1-4**: Model identity, intended use, and scope documented.",
+        "",
+        "## Thresholds & Policy Settings",
+        f"- **Minimum subgroup n**: {thresholds.get('min_subgroup_n', 'N/A')}",
+        f"- **Demographic parity ratio**: {thresholds.get('demographic_parity_ratio', 'N/A')}",
+        f"- **Equalized odds diff**: {thresholds.get('equalized_odds_diff', 'N/A')}",
+        f"- **Calibration diff**: {thresholds.get('calibration_diff', 'N/A')}",
+        f"- **Minimum AUROC**: {thresholds.get('min_auroc', 'N/A')}",
+        f"- **Max missing rate**: {thresholds.get('max_missing_rate', 'N/A')}",
         "",
         "## Reproducibility",
         f"- **Random seed**: {results.random_seed if results.random_seed is not None else 'N/A'}",
@@ -88,6 +115,7 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         "## Governance Sign-off",
         "- **Reviewer name**: _______________________________",
         "- **Role/Title**: _______________________________",
+        "- **Review date**: _______________________________",
         "- **Decision**: ☐ Approve ☐ Conditional ☐ Reject",
         "- **Comments**:",
         "",

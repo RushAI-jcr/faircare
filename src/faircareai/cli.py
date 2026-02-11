@@ -125,8 +125,14 @@ def dashboard(port: int, host: str) -> None:
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["html", "pdf", "pptx", "json", "model-card"], case_sensitive=False),
-    help="Output format (html, pdf, pptx, json, model-card). Overrides file suffix if provided.",
+    type=click.Choice(
+        ["html", "pdf", "pptx", "json", "model-card", "repro-bundle"],
+        case_sensitive=False,
+    ),
+    help=(
+        "Output format (html, pdf, pptx, json, model-card, repro-bundle). "
+        "Overrides file suffix if provided."
+    ),
 )
 @click.option(
     "--persona",
@@ -289,7 +295,12 @@ def audit(
         fmt = output_format.lower() if output_format else None
         output_path = Path(output) if output else None
 
-        fmt_ext = "md" if fmt == "model-card" else fmt
+        if fmt == "model-card":
+            fmt_ext = "md"
+        elif fmt == "repro-bundle":
+            fmt_ext = "json"
+        else:
+            fmt_ext = fmt
 
         # Default output path if format provided without output
         if output_path is None and fmt:
@@ -326,6 +337,8 @@ def audit(
                 results.to_json(str(output_path))
             elif fmt == "model-card":
                 results.to_model_card(str(output_path))
+            elif fmt == "repro-bundle":
+                results.to_reproducibility_bundle(str(output_path))
             else:
                 console.print(
                     f"[yellow]Unknown format {fmt}, defaulting to HTML[/yellow]"

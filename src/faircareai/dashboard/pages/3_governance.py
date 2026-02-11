@@ -347,7 +347,12 @@ def render_export_section(result: Any) -> None:
 
         model_name = getattr(result, "config", None)
         base_name = model_name.model_name if model_name is not None else "faircareai_report"
-        suffix = "md" if fmt == "model-card" else fmt
+        if fmt == "model-card":
+            suffix = "md"
+        elif fmt == "repro-bundle":
+            suffix = "json"
+        else:
+            suffix = fmt
         filename = _safe_filename(base_name, suffix)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -366,6 +371,9 @@ def render_export_section(result: Any) -> None:
                 return out_path.read_bytes(), filename
             if fmt == "model-card":
                 result.to_model_card(str(out_path))
+                return out_path.read_bytes(), filename
+            if fmt == "repro-bundle":
+                result.to_reproducibility_bundle(str(out_path))
                 return out_path.read_bytes(), filename
         raise RuntimeError("Failed to generate report")
 
@@ -449,6 +457,19 @@ def render_export_section(result: Any) -> None:
                 )
             except Exception as e:
                 st.error(f"Model card export failed: {e}")
+
+        if st.button("Download Reproducibility Bundle", use_container_width=True):
+            try:
+                repro_bytes, filename = _build_report_bytes("repro-bundle")
+                st.download_button(
+                    label="Download Reproducibility Bundle",
+                    data=repro_bytes,
+                    file_name=filename,
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"Reproducibility export failed: {e}")
 
 
 def render_governance_page() -> None:

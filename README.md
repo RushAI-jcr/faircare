@@ -393,6 +393,9 @@ results.to_pptx("governance_deck.pptx")
 # Model card + reproducibility bundle
 results.to_model_card("model_card.md")
 results.to_reproducibility_bundle("reproducibility.json")
+
+# CLI reproducibility bundle
+# faircareai audit data.csv -p risk -t outcome --format repro-bundle -o repro.json
 ```
 
 ---
@@ -888,7 +891,7 @@ faircareai audit predictions.parquet -p risk_score -t outcome --threshold 0.3
 | `-t`, `--target-col` | Target/outcome column name | `-t readmit_30d` |
 | `-a`, `--attributes` | Sensitive attribute (repeatable) | `-a race -a sex` |
 | `-o`, `--output` | Output file path | `-o report.html` |
-| `--format` | Output format (html, pdf, pptx, json, model-card) | `--format pdf` |
+| `--format` | Output format (html, pdf, pptx, json, model-card, repro-bundle) | `--format pdf` |
 | `--persona` | Output persona (data_scientist, governance) | `--persona governance` |
 | `--seed` | Random seed for bootstrap | `--seed 42` |
 | `--threshold` | Decision threshold (0-1) | `--threshold 0.3` |
