@@ -43,7 +43,7 @@ FairCareAI is a Python package for auditing machine learning models for fairness
 - **Plain Language Explanations**: Every visualization includes clear explanations of axes, metrics, and clinical significance
 - **Publication-Ready Typography**: Minimum 14px fonts
 - **Accessibility-First Design**: WCAG 2.1 AA compliant, colorblind-safe palettes
-- **Multiple Export Formats**: HTML dashboards, PDF reports, PNG figure bundles, PowerPoint decks
+- **Multiple Export Formats**: HTML dashboards, PDF reports, PNG figure bundles, charted PowerPoint decks
 - **Model Card + Reproducibility Bundle**: Governance-ready summary and environment capture
 - **HIPAA-Friendly**: All computation runs locally, no cloud dependencies
 - **TRIPOD+AI Compliant**: Scientifically validated performance metrics
@@ -401,6 +401,9 @@ results.to_reproducibility_bundle("reproducibility.json")
 
 # PNG bundle of figures
 results.to_png("figures.zip", persona="governance")
+
+# Data scientist PNGs with OPTIONAL metrics
+results.to_png("figures_ds.zip", persona="data_scientist", include_optional=True)
 ```
 
 ---
@@ -898,6 +901,7 @@ faircareai audit predictions.parquet -p risk_score -t outcome --threshold 0.3
 | `-o`, `--output` | Output file path | `-o report.html` |
 | `--format` | Output format (html, pdf, pptx, json, png, model-card, repro-bundle) | `--format pdf` |
 | `--persona` | Output persona (data_scientist, governance) | `--persona governance` |
+| `--include-optional` | Include OPTIONAL metrics (data scientist) | `--include-optional` |
 | `--seed` | Random seed for bootstrap | `--seed 42` |
 | `--threshold` | Decision threshold (0-1) | `--threshold 0.3` |
 

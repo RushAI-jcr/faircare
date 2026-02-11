@@ -142,6 +142,12 @@ def dashboard(port: int, host: str) -> None:
     help="Output persona for reports.",
 )
 @click.option(
+    "--include-optional",
+    is_flag=True,
+    default=False,
+    help="Include OPTIONAL metrics in data scientist outputs.",
+)
+@click.option(
     "--threshold",
     default=0.5,
     help="Decision threshold for binary classification (default: 0.5)",
@@ -175,6 +181,7 @@ def audit(
     model_name: str,
     attributes: tuple[str, ...],
     persona: str,
+    include_optional: bool,
 ) -> None:
     """Run a fairness audit on model predictions.
 
@@ -332,15 +339,27 @@ def audit(
             )
 
             if fmt == "html":
-                results.to_html(str(output_path), persona=persona_enum)
+                results.to_html(
+                    str(output_path),
+                    persona=persona_enum,
+                    include_optional=include_optional,
+                )
             elif fmt == "pdf":
-                results.to_pdf(str(output_path), persona=persona_enum)
+                results.to_pdf(
+                    str(output_path),
+                    persona=persona_enum,
+                    include_optional=include_optional,
+                )
             elif fmt == "pptx":
                 results.to_pptx(str(output_path), persona=persona_enum)
             elif fmt == "json":
                 results.to_json(str(output_path))
             elif fmt == "png":
-                results.to_png(str(output_path), persona=persona_enum)
+                results.to_png(
+                    str(output_path),
+                    persona=persona_enum,
+                    include_optional=include_optional,
+                )
             elif fmt == "model-card":
                 results.to_model_card(str(output_path))
             elif fmt == "repro-bundle":

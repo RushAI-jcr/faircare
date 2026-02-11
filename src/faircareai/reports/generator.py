@@ -508,6 +508,14 @@ def generate_pptx_deck(
         except Exception as exc:
             logger.warning("Failed to add chart slides: %s", exc)
 
+    # Add footer to all slides
+    footer_text = f"{summary.model_name} | Audit Date: {summary.audit_date}"
+    if results is not None and getattr(results, "audit_id", None):
+        footer_text = f"Audit ID: {results.audit_id} | {summary.audit_date}"
+
+    for slide in prs.slides:
+        _add_footer(slide, footer_text)
+
     # Save presentation
     prs.save(str(output_path.resolve()))
 
@@ -2000,6 +2008,19 @@ def _add_title_slide(prs: Any, summary: AuditSummary) -> None:
     p.font.size = Pt(TYPOGRAPHY["ppt_body_size"])  # 24pt
 
 
+def _add_footer(slide: Any, footer_text: str) -> None:
+    """Add a small footer to a slide."""
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Inches, Pt
+
+    footer_box = slide.shapes.add_textbox(Inches(0.5), Inches(7.05), Inches(12.3), Inches(0.3))
+    tf = footer_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = footer_text
+    p.font.size = Pt(10)
+    p.alignment = PP_ALIGN.RIGHT
+
+
 def _add_summary_slide(prs: Any, summary: AuditSummary) -> None:
     """Add executive summary slide with publication-ready typography."""
     from pptx.dml.color import RGBColor
@@ -2154,14 +2175,21 @@ def _add_chart_slides(prs: Any, results: "AuditResults") -> None:
         slide_layout = prs.slide_layouts[6]
         slide = prs.slides.add_slide(slide_layout)
         _add_title(slide, title)
-        png = render_png_bytes(fig, scale=2)
+        width_in = 12.3
+        height_in = 5.9
+        png = render_png_bytes(
+            fig,
+            scale=2,
+            width=int(width_in * 150),
+            height=int(height_in * 150),
+        )
         image_stream = BytesIO(png)
         slide.shapes.add_picture(
             image_stream,
             Inches(0.5),
             Inches(1.1),
-            width=Inches(12.3),
-            height=Inches(5.9),
+            width=Inches(width_in),
+            height=Inches(height_in),
         )
 
     def _add_grid_slide(title: str, figs: list[Any]) -> None:
@@ -2172,8 +2200,10 @@ def _add_chart_slides(prs: Any, results: "AuditResults") -> None:
         left = Inches(0.5)
         top = Inches(1.1)
         gutter = Inches(0.3)
-        cell_w = Inches(6.0)
-        cell_h = Inches(2.85)
+        cell_w_in = 6.0
+        cell_h_in = 2.85
+        cell_w = Inches(cell_w_in)
+        cell_h = Inches(cell_h_in)
 
         positions = [
             (left, top),
@@ -2183,7 +2213,12 @@ def _add_chart_slides(prs: Any, results: "AuditResults") -> None:
         ]
 
         for fig, (x, y) in zip(figs, positions, strict=False):
-            png = render_png_bytes(fig, scale=2)
+            png = render_png_bytes(
+                fig,
+                scale=2,
+                width=int(cell_w_in * 150),
+                height=int(cell_h_in * 150),
+            )
             image_stream = BytesIO(png)
             slide.shapes.add_picture(image_stream, x, y, width=cell_w, height=cell_h)
 

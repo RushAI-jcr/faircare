@@ -783,6 +783,7 @@ faircareai audit DATA_PATH [OPTIONS]
 | `-o`, `--output` | Output file path | `-o report.html` |
 | `--format` | Output format (html, pdf, pptx, json, png, model-card, repro-bundle) | `--format pdf` |
 | `--persona` | Output persona (data_scientist, governance) | `--persona governance` |
+| `--include-optional` | Include OPTIONAL metrics (data scientist) | `--include-optional` |
 | `--seed` | Random seed for bootstrap | `--seed 42` |
 | `--threshold` | Decision threshold (0-1) | `--threshold 0.3` |
 | `--model-name` | Model display name | `--model-name "Risk v2"` |
@@ -804,6 +805,9 @@ faircareai audit data.csv -p risk_score -t outcome --format repro-bundle -o repr
 
 # Export PNG figure bundle
 faircareai audit data.csv -p risk_score -t outcome --format png -o figures.zip
+
+# Export data scientist PNGs with optional metrics
+faircareai audit data.csv -p risk_score -t outcome --format png --include-optional -o figures.zip
 
 # Full example with all options
 faircareai audit predictions.parquet \
