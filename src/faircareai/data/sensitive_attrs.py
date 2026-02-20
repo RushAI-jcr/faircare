@@ -79,6 +79,35 @@ SUGGESTED_PATTERNS: dict[str, dict[str, Any]] = {
 }
 
 
+def _resolve_suggested_reference(
+    unique_values: list[Any], suggested_reference: str | None
+) -> str | None:
+    """Resolve suggested reference to an in-data value using light alias matching."""
+    if suggested_reference is None:
+        return None
+
+    value_map = {str(v).strip().lower(): str(v) for v in unique_values}
+    direct = value_map.get(suggested_reference.strip().lower())
+    if direct is not None:
+        return direct
+
+    alias_map: dict[str, list[str]] = {
+        "commercial": ["private"],
+        "private": ["commercial"],
+        "male": ["m"],
+        "female": ["f"],
+        "english": ["en", "eng"],
+        "white": ["white non-hispanic", "non-hispanic white", "white_non_hispanic"],
+    }
+
+    for alias in alias_map.get(suggested_reference.strip().lower(), []):
+        alias_match = value_map.get(alias)
+        if alias_match is not None:
+            return alias_match
+
+    return None
+
+
 def suggest_sensitive_attributes(df: pl.DataFrame) -> list[dict]:
     """
     Scan DataFrame columns and suggest likely sensitive attributes.
@@ -113,6 +142,13 @@ def suggest_sensitive_attributes(df: pl.DataFrame) -> list[dict]:
                 # Calculate missing rate
                 missing_rate = col_data.null_count() / len(df)
 
+                suggested_reference = _resolve_suggested_reference(
+                    unique_vals,
+                    config["suggested_reference"],
+                )
+                if config["suggested_reference"] is not None and suggested_reference is None:
+                    suggested_reference = get_reference_group(df, actual_col)
+
                 suggestions.append(
                     {
                         "suggested_name": attr_name,
@@ -120,7 +156,7 @@ def suggest_sensitive_attributes(df: pl.DataFrame) -> list[dict]:
                         "unique_values": unique_vals[:10],  # First 10 for preview
                         "n_unique": len(unique_vals),
                         "missing_rate": float(missing_rate),
-                        "suggested_reference": config["suggested_reference"],
+                        "suggested_reference": suggested_reference,
                         "clinical_justification": config["clinical_justification"],
                         "accepted": False,  # User must explicitly accept
                     }

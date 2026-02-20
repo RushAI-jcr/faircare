@@ -38,7 +38,7 @@ Implemented **dynamic text color selection** using WCAG 2.1 relative luminance f
 
 ### 1. New Accessibility Function
 
-**File:** [src/faircareai/visualization/themes.py](src/faircareai/visualization/themes.py#L61-L118)
+**File:** [src/faircareai/visualization/themes.py](../../src/faircareai/visualization/themes.py#L61-L118)
 
 Added `get_contrast_text_color(background_hex: str) -> str`:
 - Uses WCAG 2.1 relative luminance calculation
@@ -58,7 +58,7 @@ contrast = (L1 + 0.05) / (L2 + 0.05)  # where L1 > L2
 
 ### 2. Governance Dashboard Updates
 
-**File:** [src/faircareai/visualization/governance_dashboard.py](src/faircareai/visualization/governance_dashboard.py)
+**File:** [src/faircareai/visualization/governance_dashboard.py](../../src/faircareai/visualization/governance_dashboard.py)
 
 Updated **6 bar chart functions** with dynamic text color:
 
@@ -88,7 +88,7 @@ Updated **6 bar chart functions** with dynamic text color:
 
 ### 3. Plots Module Updates
 
-**File:** [src/faircareai/visualization/plots.py](src/faircareai/visualization/plots.py)
+**File:** [src/faircareai/visualization/plots.py](../../src/faircareai/visualization/plots.py)
 
 Updated **4 chart functions** with dynamic text color:
 

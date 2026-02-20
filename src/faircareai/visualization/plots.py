@@ -836,7 +836,9 @@ def create_metric_comparison_chart(
                     marker_color=bar_color,
                     text=[f"{v:.0%}" for v in metric_values],
                     textposition="inside",
-                    textfont=dict(color=get_contrast_text_color(bar_color), size=TYPOGRAPHY["tick_size"]),
+                    textfont=dict(
+                        color=get_contrast_text_color(bar_color), size=TYPOGRAPHY["tick_size"]
+                    ),
                     hovertemplate=(f"<b>%{{x}}</b><br>{display_label}: %{{y:.1%}}<extra></extra>"),
                 )
             )
@@ -1269,7 +1271,9 @@ def create_sample_size_waterfall(
             ),
             text=[f"{n:,}" for n in n_values],
             textposition="inside",
-            textfont=dict(color=[get_contrast_text_color(c) for c in colors], size=TYPOGRAPHY["tick_size"]),
+            textfont=dict(
+                color=[get_contrast_text_color(c) for c in colors], size=TYPOGRAPHY["tick_size"]
+            ),
             hovertemplate="<b>%{x}</b><br>n = %{y:,}<extra></extra>",
         )
     )

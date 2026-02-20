@@ -8,7 +8,7 @@ from datetime import datetime
 from importlib import resources
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from faircareai.core.exceptions import ConfigurationError
 from faircareai.core.logging import get_logger
@@ -40,7 +40,7 @@ def _optional_text(value: Any) -> str | None:
     if isinstance(value, str):
         text = value.strip()
         return text or None
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         items = [str(v).strip() for v in value if str(v).strip()]
         return "; ".join(items) if items else None
     return str(value)
@@ -49,7 +49,7 @@ def _optional_text(value: Any) -> str | None:
 def _join_list(value: Any, default: str = "Not specified", sep: str = "; ") -> str:
     if value is None:
         return default
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         items = [str(v).strip() for v in value if str(v).strip()]
         return sep.join(items) if items else default
     if isinstance(value, str):
@@ -64,7 +64,7 @@ def _normalize_keywords(value: Any) -> list[str]:
     if isinstance(value, str):
         text = value.strip()
         return [text] if text else []
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         return [str(v).strip() for v in value if str(v).strip()]
     return [str(value)]
 
@@ -177,7 +177,9 @@ def build_chai_model_card_payload(results: AuditResults) -> dict[str, Any]:
     cal = perf.get("calibration", {})
     cls = perf.get("classification_at_threshold", {})
 
-    fairness_attrs = ", ".join(results.fairness_metrics.keys()) if results.fairness_metrics else "N/A"
+    fairness_attrs = (
+        ", ".join(results.fairness_metrics.keys()) if results.fairness_metrics else "N/A"
+    )
 
     usefulness_defaults = _format_metric_result(
         [
@@ -190,7 +192,9 @@ def build_chai_model_card_payload(results: AuditResults) -> dict[str, Any]:
         [
             (
                 "Primary fairness metric",
-                config.primary_fairness_metric.value if config.primary_fairness_metric else "Not specified",
+                config.primary_fairness_metric.value
+                if config.primary_fairness_metric
+                else "Not specified",
             ),
             ("Flags", len(results.flags)),
             ("Attributes", fairness_attrs),
@@ -463,7 +467,10 @@ def build_chai_model_card_payload(results: AuditResults) -> dict[str, Any]:
                 "ValidationProcessAndJustification": _as_text(
                     _value(
                         _section(key_metrics_overrides, "usefulness_usability_efficacy"),
-                        ["validation_process_and_justification", "ValidationProcessAndJustification"],
+                        [
+                            "validation_process_and_justification",
+                            "ValidationProcessAndJustification",
+                        ],
                         config.fairness_justification or "Not specified",
                     )
                 ),
@@ -507,7 +514,10 @@ def build_chai_model_card_payload(results: AuditResults) -> dict[str, Any]:
                 "ValidationProcessAndJustification": _as_text(
                     _value(
                         _section(key_metrics_overrides, "fairness_equity"),
-                        ["validation_process_and_justification", "ValidationProcessAndJustification"],
+                        [
+                            "validation_process_and_justification",
+                            "ValidationProcessAndJustification",
+                        ],
                         config.fairness_justification or "Not specified",
                     )
                 ),
@@ -551,7 +561,10 @@ def build_chai_model_card_payload(results: AuditResults) -> dict[str, Any]:
                 "ValidationProcessAndJustification": _as_text(
                     _value(
                         _section(key_metrics_overrides, "safety_reliability"),
-                        ["validation_process_and_justification", "ValidationProcessAndJustification"],
+                        [
+                            "validation_process_and_justification",
+                            "ValidationProcessAndJustification",
+                        ],
                         "Not specified",
                     )
                 ),
@@ -608,9 +621,9 @@ def build_chai_model_card_payload(results: AuditResults) -> dict[str, Any]:
         _value(transparency_overrides, ["third_party_information", "ThirdPartyInformation"], None)
     )
     if third_party:
-        payload["TrustIngredients"]["TransparencyInformation"][
-            "ThirdPartyInformation"
-        ] = third_party
+        payload["TrustIngredients"]["TransparencyInformation"]["ThirdPartyInformation"] = (
+            third_party
+        )
 
     evaluation_refs = _optional_text(
         _value(resources_overrides, ["evaluation_references", "EvaluationReferences"], None)
@@ -674,7 +687,9 @@ def _build_xml(payload: dict[str, Any]) -> bytes:
         _add_text(keywords_el, "Keyword", keyword)
 
     uses = ET.SubElement(root, _ns_tag("UsesAndDirections"))
-    _add_text(uses, "IntendedUseAndWorkflow", payload["UsesAndDirections"]["IntendedUseAndWorkflow"])
+    _add_text(
+        uses, "IntendedUseAndWorkflow", payload["UsesAndDirections"]["IntendedUseAndWorkflow"]
+    )
     _add_text(uses, "PrimaryIntendedUsers", payload["UsesAndDirections"]["PrimaryIntendedUsers"])
     _add_text(uses, "HowToUse", payload["UsesAndDirections"]["HowToUse"])
     _add_text(
@@ -765,7 +780,7 @@ def _build_xml(payload: dict[str, Any]) -> bytes:
 
     _add_text(root, "Bibliography", payload["Bibliography"])
 
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    return cast(bytes, ET.tostring(root, encoding="utf-8", xml_declaration=True))
 
 
 def _validate_xml(xml_bytes: bytes) -> None:
@@ -774,7 +789,7 @@ def _validate_xml(xml_bytes: bytes) -> None:
     except ImportError:
         logger.warning(
             "xmlschema not installed; skipping CHAI model card validation. "
-            "Install with: pip install \"faircareai[compliance]\""
+            'Install with: pip install "faircareai[compliance]"'
         )
         return
 

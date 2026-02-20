@@ -21,11 +21,12 @@ Methodology: Van Calster et al. (2025), CHAI RAIC Checkpoint 1.
 import asyncio
 import html
 import re
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
@@ -106,9 +107,7 @@ def _count_subgroups(results: "AuditResults") -> int:
     for _attr_name, metrics in results.subgroup_performance.items():
         if isinstance(metrics, dict):
             groups = metrics.get("groups", metrics)
-            n_groups += len(
-                [k for k in groups if k not in ("reference", "attribute", "threshold")]
-            )
+            n_groups += len([k for k in groups if k not in ("reference", "attribute", "threshold")])
     return n_groups
 
 
@@ -128,7 +127,9 @@ def _build_audit_trail_rows(
     run_timestamp = run_timestamp or date.today().isoformat()
 
     model_name = (
-        results.config.model_name if results is not None else (summary.model_name if summary else "N/A")
+        results.config.model_name
+        if results is not None
+        else (summary.model_name if summary else "N/A")
     )
     model_version = results.config.model_version if results is not None else ""
     model_label = f"{model_name} v{model_version}" if model_version else model_name
@@ -243,7 +244,8 @@ def _render_audit_trail_html(
     """Render audit trail section as HTML."""
     rows = _build_audit_trail_rows(results, summary, report_generated_at)
     row_html = "\n".join(
-        f"<tr><th>{html.escape(label)}</th><td>{html.escape(value)}</td></tr>" for label, value in rows
+        f"<tr><th>{html.escape(label)}</th><td>{html.escape(value)}</td></tr>"
+        for label, value in rows
     )
     return f"""
     <section class="section audit-trail">
@@ -270,7 +272,7 @@ def _run_playwright_pdf_generation(
     html_content: str,
     output_path: Path,
     page_format: str = "Letter",
-    margins: dict | None = None,
+    margins: dict[str, str] | None = None,
 ) -> None:
     """Run Playwright PDF generation, handling async context (Jupyter) safely.
 
@@ -332,7 +334,7 @@ def _run_playwright_pdf_generation(
             page.pdf(
                 path=str(output_path.resolve()),
                 format=page_format,
-                margin=margins,
+                margin=cast(Any, margins),
                 print_background=True,
             )
 
@@ -497,17 +499,22 @@ def generate_pptx_deck(
         options.include_subgroup_charts = False
         options.include_vancalster_dashboard = False
 
-    slide_builders: dict[str, callable] = {
+    slide_builders: dict[str, Callable[[], None]] = {
         "title": lambda: _add_title_slide(prs, summary, logo_path=options.logo_path),
         "summary": lambda: _add_summary_slide(prs, summary),
         "key_findings": lambda: _add_findings_slide(prs, summary),
         "methodology": lambda: _add_recommendations_slide(prs, summary),
-        "exec_summary_chart": lambda: _add_exec_summary_chart_slide(prs, results),
-        "scorecard_chart": lambda: _add_scorecard_chart_slide(prs, results),
-        "overall_charts": lambda: _add_overall_charts_slide(prs, results),
-        "subgroup_charts": lambda: _add_subgroup_charts_slides(prs, results),
-        "vancalster_dashboard": lambda: _add_vancalster_slide(prs, results),
     }
+    if results is not None:
+        slide_builders.update(
+            {
+                "exec_summary_chart": lambda: _add_exec_summary_chart_slide(prs, results),
+                "scorecard_chart": lambda: _add_scorecard_chart_slide(prs, results),
+                "overall_charts": lambda: _add_overall_charts_slide(prs, results),
+                "subgroup_charts": lambda: _add_subgroup_charts_slides(prs, results),
+                "vancalster_dashboard": lambda: _add_vancalster_slide(prs, results),
+            }
+        )
 
     default_order = [
         "title",
@@ -541,14 +548,6 @@ def generate_pptx_deck(
         if key == "subgroup_charts" and not options.include_subgroup_charts:
             continue
         if key == "vancalster_dashboard" and not options.include_vancalster_dashboard:
-            continue
-        if results is None and key in {
-            "exec_summary_chart",
-            "scorecard_chart",
-            "overall_charts",
-            "subgroup_charts",
-            "vancalster_dashboard",
-        }:
             continue
         builder = slide_builders.get(key)
         if builder is None:
@@ -1164,16 +1163,26 @@ def _generate_performance_section(results: "AuditResults") -> str:
             "Classification": explanations.get("classification", ""),
         }
 
-        chart_parts = ['<div class="chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">']
+        chart_parts = [
+            '<div class="chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">'
+        ]
         for title, fig in figures.items():
-            if fig is not None and hasattr(fig, 'to_html'):
+            if fig is not None and hasattr(fig, "to_html"):
                 # Add description box above each figure
                 desc_text = explanation_map.get(title, "")
-                desc_html = f'<div class="figure-description">{html.escape(desc_text)}</div>' if desc_text else ""
-                fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{title.replace(' ', '-').lower()}")
-                chart_parts.append(f'<div>{desc_html}{fig_html}</div>')
-        chart_parts.append('</div>')
-        charts_html = ''.join(chart_parts)
+                desc_html = (
+                    f'<div class="figure-description">{html.escape(desc_text)}</div>'
+                    if desc_text
+                    else ""
+                )
+                fig_html = fig.to_html(
+                    full_html=False,
+                    include_plotlyjs=False,
+                    div_id=f"chart-{title.replace(' ', '-').lower()}",
+                )
+                chart_parts.append(f"<div>{desc_html}{fig_html}</div>")
+        chart_parts.append("</div>")
+        charts_html = "".join(chart_parts)
 
         # NEW: Van Calster 2025 figures
         # ROC Curve
@@ -1193,14 +1202,14 @@ def _generate_performance_section(results: "AuditResults") -> str:
                 dca_html = f'<div style="margin: 30px 0;">{dca_fig.to_html(full_html=False, include_plotlyjs=False, div_id="chart-decision-curve")}</div>'
         except (AttributeError, TypeError) as dca_err:
             logger.warning("Decision curve generation failed: %s", dca_err)
-            dca_html = ''
+            dca_html = ""
 
     except (ValueError, TypeError, KeyError) as e:
         logger.warning("Performance chart generation failed: %s", e)
         charts_html = f'<div class="chart-placeholder">Interactive charts could not be generated: {html.escape(str(e))}</div>'
     except ImportError as e:
         logger.error("Chart library not available: %s", e)
-        charts_html = '<div class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</div>'
+        charts_html = "<div class=\"chart-placeholder\">Chart library missing. Install with: pip install 'faircareai[viz]'</div>"
 
     return f"""
     <section class="section">
@@ -1399,22 +1408,36 @@ def _generate_subgroup_section(results: "AuditResults") -> str:
 
         chart_parts = []
         for attr_name, figures in all_figures.items():
-            chart_parts.append(f'<h3 style="margin-top: 30px; color: #2c5282;">{attr_name.replace("_", " ").title()}</h3>')
-            chart_parts.append('<div class="subgroup-charts" style="display: flex; flex-direction: column; gap: 40px; margin-top: 20px;">')
+            chart_parts.append(
+                f'<h3 style="margin-top: 30px; color: #2c5282;">{attr_name.replace("_", " ").title()}</h3>'
+            )
+            chart_parts.append(
+                '<div class="subgroup-charts" style="display: flex; flex-direction: column; gap: 40px; margin-top: 20px;">'
+            )
             for title, fig in figures.items():
                 if fig is not None:
-                    fig_html = fig.to_html(full_html=False, include_plotlyjs=False, div_id=f"chart-{attr_name}-{title.replace(' ', '-').lower()}")
+                    fig_html = fig.to_html(
+                        full_html=False,
+                        include_plotlyjs=False,
+                        div_id=f"chart-{attr_name}-{title.replace(' ', '-').lower()}",
+                    )
                     explanation = CHART_EXPLANATIONS.get(title, "")
-                    explanation_html = f'<p style="color: #666; font-size: 13px; margin-top: 8px; padding: 0 20px;">{explanation}</p>' if explanation else ""
-                    chart_parts.append(f'<div style="margin-bottom: 20px;">{fig_html}{explanation_html}</div>')
-            chart_parts.append('</div>')
-        charts_html = ''.join(chart_parts)
+                    explanation_html = (
+                        f'<p style="color: #666; font-size: 13px; margin-top: 8px; padding: 0 20px;">{explanation}</p>'
+                        if explanation
+                        else ""
+                    )
+                    chart_parts.append(
+                        f'<div style="margin-bottom: 20px;">{fig_html}{explanation_html}</div>'
+                    )
+            chart_parts.append("</div>")
+        charts_html = "".join(chart_parts)
     except (ValueError, TypeError, KeyError) as e:
         logger.warning("Subgroup chart generation failed: %s", e)
         charts_html = f'<div class="chart-placeholder">Interactive charts could not be generated: {html.escape(str(e))}</div>'
     except ImportError as e:
         logger.error("Chart library not available: %s", e)
-        charts_html = '<div class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</div>'
+        charts_html = "<div class=\"chart-placeholder\">Chart library missing. Install with: pip install 'faircareai[viz]'</div>"
 
     return f"""
     <section class="section">
@@ -1504,13 +1527,16 @@ def _generate_fairness_section(results: "AuditResults") -> str:
     }
 
     # Get info for selected metric
-    selected_info = metric_info.get(metric, {
-        "name": "Not Specified",
-        "description": "No primary fairness metric selected.",
-        "what_to_look_for": "Review all metrics below.",
-        "key_metric": None,
-        "threshold_note": "Differences < 0.10 are typically acceptable.",
-    })
+    selected_info = metric_info.get(
+        cast(Any, metric),
+        {
+            "name": "Not Specified",
+            "description": "No primary fairness metric selected.",
+            "what_to_look_for": "Review all metrics below.",
+            "key_metric": "none",
+            "threshold_note": "Differences < 0.10 are typically acceptable.",
+        },
+    )
 
     # Build table rows with all metrics, highlighting the primary one
     fairness_rows = ""
@@ -1559,7 +1585,7 @@ def _generate_fairness_section(results: "AuditResults") -> str:
         is_pp_primary = metric == FairnessMetric.PREDICTIVE_PARITY
         is_cal_primary = metric == FairnessMetric.CALIBRATION
 
-        fairness_rows += f'''
+        fairness_rows += f"""
         <tr>
             <td>{attr_name}</td>
             {format_cell(dp_diff, dp_pass, is_dp_primary)}
@@ -1568,7 +1594,7 @@ def _generate_fairness_section(results: "AuditResults") -> str:
             {format_cell(pp_diff, pp_pass, is_pp_primary)}
             {format_cell(cal_diff, cal_pass, is_cal_primary)}
         </tr>
-        '''
+        """
 
     # Primary metric badge color
     metric_color = "#0072B2" if metric else "#666"
@@ -1641,7 +1667,11 @@ def _generate_flags_section(results: "AuditResults") -> str:
         </div>
         """)
 
-    flags_html = ''.join(flag_parts) if flag_parts else '<p style="color: green;">No flags or warnings raised.</p>'
+    flags_html = (
+        "".join(flag_parts)
+        if flag_parts
+        else '<p style="color: green;">No flags or warnings raised.</p>'
+    )
 
     return f"""
     <section class="section">
@@ -1726,8 +1756,10 @@ def _generate_report_html(
 
     report_generated_at = datetime.now().astimezone().isoformat(timespec="seconds")
     audit_run_at = (
-        results.run_timestamp if results is not None else None
-    ) or summary.audit_date or date.today().isoformat()
+        (results.run_timestamp if results is not None else None)
+        or summary.audit_date
+        or date.today().isoformat()
+    )
 
     # Generate charts if requested
     charts_html = ""
@@ -1747,12 +1779,10 @@ def _generate_report_html(
                 """
             except (ValueError, TypeError, KeyError) as e:
                 logger.warning("Chart generation failed: %s", e)
-                charts_html = (
-                    f'<p class="chart-placeholder">Charts could not be generated: {html.escape(str(e))}</p>'
-                )
+                charts_html = f'<p class="chart-placeholder">Charts could not be generated: {html.escape(str(e))}</p>'
             except ImportError as e:
                 logger.error("Chart library not available: %s", e)
-                charts_html = '<p class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</p>'
+                charts_html = "<p class=\"chart-placeholder\">Chart library missing. Install with: pip install 'faircareai[viz]'</p>"
         elif summary.metrics_df is not None and len(summary.metrics_df) > 0:
             # Fall back to forest plot from metrics_df
             try:
@@ -1765,7 +1795,7 @@ def _generate_report_html(
                 charts_html = '<p class="chart-placeholder">Charts could not be generated.</p>'
             except ImportError as e:
                 logger.error("Chart library not available: %s", e)
-                charts_html = '<p class="chart-placeholder">Chart library missing. Install with: pip install \'faircareai[viz]\'</p>'
+                charts_html = "<p class=\"chart-placeholder\">Chart library missing. Install with: pip install 'faircareai[viz]'</p>"
         else:
             charts_html = '<p class="chart-placeholder">No chart data available.</p>'
 
@@ -2503,13 +2533,15 @@ def _generate_governance_html(results: "AuditResults") -> str:
         overall_figures_html = _render_governance_overall_figures(results)
     except (ValueError, TypeError, KeyError) as e:
         logger.warning("Governance overall chart generation failed: %s", e)
-        overall_figures_html = '<p class="chart-placeholder">Overall figures could not be generated.</p>'
+        overall_figures_html = (
+            '<p class="chart-placeholder">Overall figures could not be generated.</p>'
+        )
     except FigureExportError as e:
         logger.warning("Chart export failed: %s", e)
         overall_figures_html = f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
     except ImportError as e:
         logger.error("Visualization library missing: %s", e)
-        overall_figures_html = '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
+        overall_figures_html = "<p class=\"chart-placeholder\">Install visualization dependencies: pip install 'faircareai[viz]'</p>"
     except Exception:
         # Keep broad catch for truly unexpected errors
         logger.exception("Unexpected error in governance overall chart generation")
@@ -2521,17 +2553,21 @@ def _generate_governance_html(results: "AuditResults") -> str:
         subgroup_figures_html = _render_governance_subgroup_figures(results)
     except (ValueError, TypeError, KeyError) as e:
         logger.warning("Governance subgroup chart generation failed: %s", e)
-        subgroup_figures_html = '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
+        subgroup_figures_html = (
+            '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
+        )
     except FigureExportError as e:
         logger.warning("Chart export failed: %s", e)
         subgroup_figures_html = f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
     except ImportError as e:
         logger.error("Visualization library missing: %s", e)
-        subgroup_figures_html = '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
+        subgroup_figures_html = "<p class=\"chart-placeholder\">Install visualization dependencies: pip install 'faircareai[viz]'</p>"
     except Exception:
         # Keep broad catch for truly unexpected errors
         logger.exception("Unexpected error in governance subgroup chart generation")
-        subgroup_figures_html = '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
+        subgroup_figures_html = (
+            '<p class="chart-placeholder">Subgroup figures could not be generated.</p>'
+        )
 
     # Plain language summary (use computed values from above)
     n_pass = gov.get("n_pass", gov.get("within_threshold_count", 0))
@@ -2556,15 +2592,25 @@ def _generate_governance_html(results: "AuditResults") -> str:
 
     primary_metric = results.config.primary_fairness_metric
     metric_descriptions = {
-        FairnessMetric.DEMOGRAPHIC_PARITY: ("Demographic Parity", "Equal selection rates across groups"),
+        FairnessMetric.DEMOGRAPHIC_PARITY: (
+            "Demographic Parity",
+            "Equal selection rates across groups",
+        ),
         FairnessMetric.EQUALIZED_ODDS: ("Equalized Odds", "Equal TPR and FPR across groups"),
-        FairnessMetric.EQUAL_OPPORTUNITY: ("Equal Opportunity", "Equal detection rates (TPR) across groups"),
-        FairnessMetric.PREDICTIVE_PARITY: ("Predictive Parity", "Equal positive predictive values across groups"),
+        FairnessMetric.EQUAL_OPPORTUNITY: (
+            "Equal Opportunity",
+            "Equal detection rates (TPR) across groups",
+        ),
+        FairnessMetric.PREDICTIVE_PARITY: (
+            "Predictive Parity",
+            "Equal positive predictive values across groups",
+        ),
         FairnessMetric.CALIBRATION: ("Calibration", "Equal calibration accuracy across groups"),
     }
-    metric_name, metric_desc = metric_descriptions.get(
-        primary_metric, ("Not Specified", "No primary fairness metric was selected")
-    )
+    if primary_metric in metric_descriptions:
+        metric_name, metric_desc = metric_descriptions[primary_metric]
+    else:
+        metric_name, metric_desc = ("Not Specified", "No primary fairness metric was selected")
     metric_justification = results.config.fairness_justification or "Not provided"
 
     audit_trail_html = _render_audit_trail_html(
@@ -3030,7 +3076,7 @@ def _render_governance_overall_figures(results: "AuditResults") -> str:
 
         html_parts = ['<div class="figure-grid">']
         for title, fig in figures.items():
-            if fig is not None and hasattr(fig, 'to_html'):
+            if fig is not None and hasattr(fig, "to_html"):
                 # Render interactive Plotly chart
                 fig_html = fig.to_html(full_html=False, include_plotlyjs=False)
                 html_parts.append(f"""
@@ -3049,7 +3095,7 @@ def _render_governance_overall_figures(results: "AuditResults") -> str:
         return f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
     except ImportError as e:
         logger.error("Visualization library missing: %s", e)
-        return '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
+        return "<p class=\"chart-placeholder\">Install visualization dependencies: pip install 'faircareai[viz]'</p>"
     except Exception as e:
         # Keep broad catch for truly unexpected errors
         logger.exception("Unexpected error rendering governance overall figures")
@@ -3102,7 +3148,7 @@ def _render_governance_subgroup_figures(results: "AuditResults") -> str:
         return f'<p class="chart-placeholder">Chart export failed: {e.reason}</p>'
     except ImportError as e:
         logger.error("Visualization library missing: %s", e)
-        return '<p class="chart-placeholder">Install visualization dependencies: pip install \'faircareai[viz]\'</p>'
+        return "<p class=\"chart-placeholder\">Install visualization dependencies: pip install 'faircareai[viz]'</p>"
     except Exception as e:
         # Keep broad catch for truly unexpected errors
         logger.exception("Unexpected error rendering governance subgroup figures")
@@ -3172,7 +3218,7 @@ def _generate_plain_language_findings(results: "AuditResults") -> str:
             f"<strong>Warning:</strong> Small sample size (N = {n_total:,}) limits reliability of results."
         )
 
-    return ''.join(f'<div class="finding-item">{finding}</div>' for finding in findings)
+    return "".join(f'<div class="finding-item">{finding}</div>' for finding in findings)
 
 
 def _get_detection_summary(n_errors: int, n_warnings: int) -> str:

@@ -224,7 +224,9 @@ class TestAddSourceAnnotation:
         import plotly.graph_objects as go
 
         fig = go.Figure()
-        result = add_source_annotation(fig, citation="Van Calster et al. (2025) Lancet Digit Health")
+        result = add_source_annotation(
+            fig, citation="Van Calster et al. (2025) Lancet Digit Health"
+        )
         assert result is not None
         assert isinstance(result, go.Figure)
         # Citations now added in HTML report footer

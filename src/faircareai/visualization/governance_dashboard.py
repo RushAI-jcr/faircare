@@ -245,9 +245,10 @@ def create_executive_summary(results: "AuditResults") -> go.Figure:
         title=dict(
             text=f"<b>Governance Review: {results.config.model_name}</b><br>"
             f"<sup>Version {results.config.model_version}</sup>",
-            x=0,
+            x=0.02,
             xanchor="left",
             font=dict(size=18),
+            pad=dict(t=10, l=8, r=8, b=0),
         ),
         height=800,
         margin=dict(l=80, r=40, t=80, b=140),  # Extra bottom for rotated labels
@@ -426,12 +427,15 @@ def create_go_nogo_scorecard(results: "AuditResults") -> go.Figure:
                 f"<span style='color:{overall_color}; font-size:24px'>{overall}</span><br>"
                 f"<sup>{n_pass} Pass | {n_warn} Near | {n_fail} Outside</sup>"
             ),
-            x=0,
+            x=0.02,
             xanchor="left",
+            y=0.97,
+            yanchor="top",
             font=dict(size=16),
+            pad=dict(t=12, l=8, r=8, b=0),
         ),
         height=500,
-        margin=dict(l=80, r=40, t=120, b=80),
+        margin=dict(l=84, r=44, t=132, b=84),
         meta={"description": alt_text},  # WCAG 2.1 screen reader support
     )
     return fig
@@ -1003,6 +1007,7 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, Any]
     perf = results.overall_performance
     disc = perf.get("discrimination", {})
     cal = perf.get("calibration", {})
+    percent_ticks_without_zero = [0.2, 0.4, 0.6, 0.8, 1.0]
 
     # Plain language explanations for governance audiences
     PLAIN_EXPLANATIONS = {
@@ -1121,12 +1126,19 @@ def create_governance_overall_figures(results: "AuditResults") -> dict[str, Any]
         FAIRCAREAI_COLORS["success"] if 0.8 <= slope <= 1.2 else FAIRCAREAI_COLORS["error"]
     )
     fig_cal.update_layout(
-        title=dict(text="<b>Calibration</b>", font=dict(size=20)),
+        title=dict(
+            text="<b>Calibration</b>",
+            font=dict(size=20),
+            x=0.02,
+            xanchor="left",
+            pad=dict(t=12, l=8, r=8, b=0),
+        ),
         xaxis=dict(
             title="Predicted Risk (what the model says)",
             range=[0, 1],
             tickfont={"size": 14},
             tickformat=".0%",
+            tickvals=percent_ticks_without_zero,
         ),
         yaxis=dict(
             title="Observed Rate (what actually happened)",
@@ -1341,7 +1353,10 @@ def create_governance_subgroup_figures(
         ]
 
         # Determine which charts correspond to the primary metric
-        is_tpr_primary = primary_metric in (FairnessMetric.EQUAL_OPPORTUNITY, FairnessMetric.EQUALIZED_ODDS)
+        is_tpr_primary = primary_metric in (
+            FairnessMetric.EQUAL_OPPORTUNITY,
+            FairnessMetric.EQUALIZED_ODDS,
+        )
         is_fpr_primary = primary_metric == FairnessMetric.EQUALIZED_ODDS
         is_selection_primary = primary_metric == FairnessMetric.DEMOGRAPHIC_PARITY
 
@@ -1490,11 +1505,19 @@ def _create_subgroup_bar_chart(
         plot_bgcolor = "white"
 
     fig.update_layout(
-        title=dict(text=title_text, font=dict(size=16), x=0, xanchor="left"),
+        title=dict(
+            text=title_text,
+            font=dict(size=16),
+            x=0.02,
+            xanchor="left",
+            y=0.97,
+            yanchor="top",
+            pad=dict(t=14, l=8, r=8, b=4),
+        ),
         xaxis=dict(
             title=x_axis_title,
-            tickfont={"size": 11},
-            tickangle=-40,  # Moderate angle for readability
+            tickfont={"size": 12},
+            tickangle=-55,  # Steeper angle to prevent category label overlap
             title_font=dict(size=13),
             automargin=True,  # Auto-adjust margin for labels
         ),
@@ -1505,8 +1528,8 @@ def _create_subgroup_bar_chart(
             tickfont={"size": 13},
             title_font=dict(size=13),
         ),
-        height=380,  # Good height for chart
-        margin=dict(l=80, r=40, t=100, b=160),  # Top: long titles, bottom: rotated labels
+        height=400,  # More breathing room for labels and title
+        margin=dict(l=112, r=48, t=120, b=196),  # Added padding for labels and static PNG export
         showlegend=False,
         plot_bgcolor=plot_bgcolor,
     )
@@ -1572,12 +1595,19 @@ def create_governance_roc_curve(results: "AuditResults") -> go.Figure | None:
     )
 
     fig.update_layout(
-        title=dict(text="<b>ROC Curve</b>", font=dict(size=20)),
+        title=dict(
+            text="<b>ROC Curve</b>",
+            font=dict(size=20),
+            x=0.02,
+            xanchor="left",
+            pad=dict(t=12, l=8, r=8, b=0),
+        ),
         xaxis=dict(
             title="False Positive Rate (% incorrectly flagged)",
             tickformat=".0%",
             range=[0, 1],
             tickfont={"size": 14},
+            tickvals=[0.2, 0.4, 0.6, 0.8, 1.0],  # Avoid duplicate origin labels
         ),
         yaxis=dict(
             title="True Positive Rate (% correctly identified)",
@@ -1653,12 +1683,19 @@ def create_governance_probability_distribution(results: "AuditResults") -> go.Fi
     )
 
     fig.update_layout(
-        title=dict(text="<b>Risk Score Distribution by Outcome</b>", font=dict(size=20)),
+        title=dict(
+            text="<b>Risk Score Distribution by Outcome</b>",
+            font=dict(size=20),
+            x=0.02,
+            xanchor="left",
+            pad=dict(t=12, l=8, r=8, b=0),
+        ),
         xaxis=dict(
             title="Predicted Risk Score",
             tickformat=".0%",
             range=[0, 1],
             tickfont={"size": 14},
+            tickvals=[0.2, 0.4, 0.6, 0.8, 1.0],  # Avoid duplicate origin labels
         ),
         yaxis=dict(
             title="Proportion of Patients",

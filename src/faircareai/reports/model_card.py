@@ -110,7 +110,10 @@ def generate_model_card_markdown(results: AuditResults, path: str | Path) -> Pat
         "Warnings",
         [
             ("Known risks and limitations", warnings.get("KnownRisksAndLimitations")),
-            ("Known biases or ethical considerations", warnings.get("KnownBiasesOrEthicalConsiderations")),
+            (
+                "Known biases or ethical considerations",
+                warnings.get("KnownBiasesOrEthicalConsiderations"),
+            ),
             ("Clinical risk level", warnings.get("ClinicalRiskLevel")),
         ],
     )

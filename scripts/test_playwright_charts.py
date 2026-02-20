@@ -152,7 +152,7 @@ def test_chart_contrast_with_playwright(html_path: Path) -> dict:
             except Exception as e:
                 print(f"   ⚠️  Chart {i}: Error - {e}")
 
-        print(f"\n📊 Testing Summary:")
+        print("\n📊 Testing Summary:")
         print(f"   Total charts detected: {results['total_charts']}")
         print(f"   Charts tested: {results['charts_tested']}")
         print(f"   Screenshots captured: {results['screenshots_captured']}")
@@ -257,7 +257,7 @@ def verify_export_formats():
         formats.append(("PowerPoint", None, 0, f"❌ {e}"))
         print(f"❌ PowerPoint: {e}")
 
-    print(f"\n📊 Export Summary:")
+    print("\n📊 Export Summary:")
     print(f"   Total formats tested: {len(formats)}")
     print(f"   Successful exports: {sum(1 for f in formats if '✅' in f[3])}")
     print(f"   Failed exports: {sum(1 for f in formats if '❌' in f[3])}")
@@ -285,18 +285,18 @@ def main():
     print("\n" + "=" * 70)
     print("FINAL SUMMARY")
     print("=" * 70)
-    print(f"\n✅ Code Updates Applied:")
-    print(f"   • Dynamic text color selection in themes.py")
-    print(f"   • 6 bar chart functions updated in governance_dashboard.py")
-    print(f"   • 4 chart functions updated in plots.py")
-    print(f"   • All charts now use WCAG-compliant text colors")
+    print("\n✅ Code Updates Applied:")
+    print("   • Dynamic text color selection in themes.py")
+    print("   • 6 bar chart functions updated in governance_dashboard.py")
+    print("   • 4 chart functions updated in plots.py")
+    print("   • All charts now use WCAG-compliant text colors")
 
-    print(f"\n📊 Playwright Testing:")
+    print("\n📊 Playwright Testing:")
     print(f"   • Charts tested: {playwright_results['charts_tested']}/{playwright_results['total_charts']}")
     print(f"   • Screenshots captured: {playwright_results['screenshots_captured']}")
     print(f"   • Text elements checked: {playwright_results['contrast_checks']}")
 
-    print(f"\n📁 Export Formats:")
+    print("\n📁 Export Formats:")
     for format_name, path, size_kb, status in export_results:
         if path:
             print(f"   {status} {format_name}: {path.name} ({size_kb:.1f} KB)")

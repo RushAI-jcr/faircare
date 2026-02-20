@@ -23,9 +23,9 @@ SRGB_GAMMA_EXPONENT = 2.4
 
 # WCAG 2.1 contrast ratio thresholds
 WCAG_AA_NORMAL_TEXT_RATIO = 4.5  # For regular text (< 18pt or < 14pt bold)
-WCAG_AA_LARGE_TEXT_RATIO = 3.0   # For large text (>= 18pt or >= 14pt bold)
+WCAG_AA_LARGE_TEXT_RATIO = 3.0  # For large text (>= 18pt or >= 14pt bold)
 WCAG_AAA_NORMAL_TEXT_RATIO = 7.0  # Enhanced contrast for regular text
-WCAG_AAA_LARGE_TEXT_RATIO = 4.5   # Enhanced contrast for large text
+WCAG_AAA_LARGE_TEXT_RATIO = 4.5  # Enhanced contrast for large text
 
 # Minimum contrast ratio for UI elements (WCAG 2.1 Level AA)
 WCAG_MIN_UI_CONTRAST = 3.0

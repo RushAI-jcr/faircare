@@ -314,6 +314,7 @@ def audit(
         fmt = output_format.lower() if output_format else None
         output_path = Path(output) if output else None
 
+        fmt_ext: str | None
         if fmt == "model-card":
             fmt_ext = "md"
         elif fmt == "chai-model-card":
@@ -392,10 +393,14 @@ def audit(
             elif fmt == "repro-bundle":
                 results.to_reproducibility_bundle(str(output_path))
             else:
-                console.print(
-                    f"[yellow]Unknown format {fmt}, defaulting to HTML[/yellow]"
+                console.print(f"[yellow]Unknown format {fmt}, defaulting to HTML[/yellow]")
+                fallback_path = (
+                    output_path.with_suffix(".html")
+                    if output_path is not None
+                    else Path("faircareai_report.html")
                 )
-                results.to_html(str(output_path.with_suffix(".html")), persona=persona_enum)
+                results.to_html(str(fallback_path), persona=persona_enum)
+                output_path = fallback_path
 
             console.print(f"  [green]Saved to {output_path}[/green]")
         except (DataValidationError, ConfigurationError, MetricComputationError) as e:

@@ -82,9 +82,9 @@ def compute_disparity(
     alpha = 1 - confidence
     ci_lower, ci_upper = ci_newcombe_wilson(
         comparison_successes,  # Swapped
-        comparison_trials,      # Swapped
-        reference_successes,    # Swapped
-        reference_trials,       # Swapped
+        comparison_trials,  # Swapped
+        reference_successes,  # Swapped
+        reference_trials,  # Swapped
         alpha,
     )
 

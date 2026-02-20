@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import plotly.io as pio
 
@@ -22,11 +22,10 @@ def render_png_bytes(
 ) -> bytes:
     """Render a Plotly figure to PNG bytes via Kaleido."""
     try:
-        return pio.to_image(fig, format="png", scale=scale, width=width, height=height)
+        return cast(bytes, pio.to_image(fig, format="png", scale=scale, width=width, height=height))
     except ValueError as err:
         raise ImportError(
-            "PNG export requires the kaleido engine. Install with: "
-            'pip install "faircareai[export]"'
+            'PNG export requires the kaleido engine. Install with: pip install "faircareai[export]"'
         ) from err
 
 
@@ -135,8 +134,8 @@ def export_png_bundle(
     # Treat as directory
     output_path.mkdir(parents=True, exist_ok=True)
     for name, fig in figures.items():
-        filename = output_path / f"{_slugify(name)}.png"
+        file_path = output_path / f"{_slugify(name)}.png"
         png_bytes = render_png_bytes(fig, scale=scale)
-        filename.write_bytes(png_bytes)
+        file_path.write_bytes(png_bytes)
 
     return output_path

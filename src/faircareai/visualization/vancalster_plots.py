@@ -408,7 +408,9 @@ def create_auroc_forest_plot(
         meta={"description": alt_text},
     )
 
-    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
+    add_source_annotation(
+        fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health"
+    )
     return fig
 
 
@@ -593,7 +595,9 @@ def create_calibration_plot_by_subgroup(
         meta={"description": alt_text},
     )
 
-    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
+    add_source_annotation(
+        fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health"
+    )
     return fig
 
 
@@ -776,7 +780,9 @@ def create_decision_curve_by_subgroup(
         meta={"description": alt_text},
     )
 
-    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
+    add_source_annotation(
+        fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health"
+    )
     return fig
 
 
@@ -976,7 +982,9 @@ def create_risk_distribution_plot(
             col=i,
         )
 
-    add_source_annotation(fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health")
+    add_source_annotation(
+        fig, source_note, citation="Van Calster et al. (2025) Lancet Digit Health"
+    )
     return fig
 
 

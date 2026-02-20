@@ -102,14 +102,13 @@ def bootstrap_metric(
         else:
             # Build index map for each class
             class_indices_map = {
-                class_value: np.where(y_true == class_value)[0]
-                for class_value in unique_classes
+                class_value: np.where(y_true == class_value)[0] for class_value in unique_classes
             }
 
     for i in range(n_bootstrap):
         if stratified:
             # Stratified bootstrap: sample within each class separately
-            idx_list = []
+            idx_list: list[int] = []
             for class_value in unique_classes:
                 class_indices = class_indices_map[class_value]
                 n_class = len(class_indices)
@@ -203,14 +202,13 @@ def bootstrap_confusion_metrics(
             stratified = False
         else:
             class_indices_map = {
-                class_value: np.where(y_true == class_value)[0]
-                for class_value in unique_classes
+                class_value: np.where(y_true == class_value)[0] for class_value in unique_classes
             }
 
     for i in range(n_bootstrap):
         if stratified:
             # Stratified bootstrap
-            idx_list = []
+            idx_list: list[int] = []
             for class_value in unique_classes:
                 class_indices = class_indices_map[class_value]
                 n_class = len(class_indices)

@@ -324,6 +324,14 @@ class TestComputeCalibrationMetrics:
         result = compute_calibration_metrics(y_true, y_prob)
         assert result["oe_ratio"] is None
 
+    def test_calibration_slope_not_artificially_shrunk_for_deterministic_scores(self) -> None:
+        """Test slope does not use regularized shrinkage on deterministic scores."""
+        np.random.seed(7)
+        y_true = np.random.binomial(1, 0.35, 2000)
+        y_prob = y_true.astype(float)
+        result = compute_calibration_metrics(y_true, y_prob)
+        assert result["calibration_slope"] > 0.95
+
 
 class TestInterpretCalibration:
     """Tests for _interpret_calibration function."""

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 
@@ -28,6 +28,7 @@ from faircareai.core.exceptions import (
 from faircareai.core.logging import get_logger
 from faircareai.core.reproducibility import build_reproducibility_bundle
 from faircareai.core.results import AuditResults
+from faircareai.core.types import OverallPerformance
 from faircareai.data.sensitive_attrs import (
     display_suggestions,
     get_reference_group,
@@ -641,7 +642,7 @@ class FairCareAudit:
         bootstrap_ci: bool,
         n_bootstrap: int,
         random_seed: int | None,
-    ) -> dict:
+    ) -> OverallPerformance:
         """Compute overall performance metrics."""
         from faircareai.metrics.performance import compute_overall_performance
 
@@ -759,8 +760,9 @@ class FairCareAudit:
 
         # Section 1-4: Computation
         results.descriptive_stats = self._compute_descriptive_statistics()
-        results.overall_performance = self._compute_overall_performance(
-            bootstrap_ci, n_bootstrap, random_seed
+        results.overall_performance = cast(
+            dict[str, Any],
+            self._compute_overall_performance(bootstrap_ci, n_bootstrap, random_seed),
         )
         results.subgroup_performance = self._compute_subgroup_performance(
             bootstrap_ci, n_bootstrap, random_seed
@@ -978,9 +980,7 @@ class FairCareAudit:
                         severity="warning",
                         category="data_quality",
                         message=f"Missing rate {missing_rate:.1%} > {max_missing:.0%}",
-                        details=(
-                            f"High missing data for {attr_name} may bias fairness estimates"
-                        ),
+                        details=(f"High missing data for {attr_name} may bias fairness estimates"),
                         chai_criteria="AC1.CR68",
                         attribute=attr_name,
                         value=missing_rate,

@@ -125,6 +125,28 @@ class TestSuggestSensitiveAttributes:
         names = [s["suggested_name"] for s in result]
         assert "insurance" in names
 
+    def test_insurance_reference_alias_resolves_private(self) -> None:
+        """Test that insurance reference resolves Commercial -> Private alias."""
+        df = pl.DataFrame(
+            {
+                "insurance": ["Private", "Private", "Medicaid", "Medicare"],
+            }
+        )
+        result = suggest_sensitive_attributes(df)
+        insurance = next(s for s in result if s["suggested_name"] == "insurance")
+        assert insurance["suggested_reference"] == "Private"
+
+    def test_invalid_default_reference_falls_back_to_largest_group(self) -> None:
+        """Test that missing defaults fall back to largest observed group."""
+        df = pl.DataFrame(
+            {
+                "sex": ["Unknown", "Unknown", "Unknown", "Female"],
+            }
+        )
+        result = suggest_sensitive_attributes(df)
+        sex = next(s for s in result if s["suggested_name"] == "sex")
+        assert sex["suggested_reference"] == "Unknown"
+
     def test_suggestion_has_required_keys(self, sample_df: pl.DataFrame) -> None:
         """Test that suggestions have all required keys."""
         result = suggest_sensitive_attributes(sample_df)

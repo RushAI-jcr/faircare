@@ -30,7 +30,8 @@ USE_WITH_CAUTION (improper measures - use with explicit caveats only):
 See constants.py for VANCALSTER_* classification constants.
 """
 
-from typing import Any
+import warnings
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -102,41 +103,36 @@ def compute_overall_performance(
         - decision_curve: DCA net benefit data
         - confusion_matrix: TP, FP, TN, FN
     """
-    results: dict[str, Any] = {
-        "primary_threshold": threshold,
-    }
-
     # Ensure numpy arrays
     y_true = np.asarray(y_true).ravel()
     y_prob = np.asarray(y_prob).ravel()
 
-    # === Discrimination Metrics ===
-    results["discrimination"] = compute_discrimination_metrics(
+    discrimination = compute_discrimination_metrics(
         y_true, y_prob, bootstrap_ci, n_bootstrap, random_seed
     )
-
-    # === Calibration Metrics ===
-    results["calibration"] = compute_calibration_metrics(y_true, y_prob)
-
-    # === Classification at Threshold ===
-    results["classification_at_threshold"] = compute_classification_at_threshold(
+    calibration = compute_calibration_metrics(y_true, y_prob)
+    classification = compute_classification_at_threshold(
         y_true, y_prob, threshold, bootstrap_ci, n_bootstrap, random_seed
     )
 
-    # === Threshold Analysis ===
     if thresholds_to_evaluate is None:
         thresholds_to_evaluate = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    results["threshold_analysis"] = compute_threshold_analysis(
-        y_true, y_prob, thresholds_to_evaluate
+    threshold_analysis = compute_threshold_analysis(y_true, y_prob, thresholds_to_evaluate)
+    decision_curve = compute_decision_curve_analysis(y_true, y_prob)
+    confusion_matrix_data = compute_confusion_matrix(y_true, y_prob, threshold)
+
+    return cast(
+        OverallPerformance,
+        {
+            "primary_threshold": threshold,
+            "discrimination": discrimination,
+            "calibration": calibration,
+            "classification_at_threshold": classification,
+            "threshold_analysis": threshold_analysis,
+            "decision_curve": decision_curve,
+            "confusion_matrix": confusion_matrix_data,
+        },
     )
-
-    # === Decision Curve Analysis ===
-    results["decision_curve"] = compute_decision_curve_analysis(y_true, y_prob)
-
-    # === Confusion Matrix ===
-    results["confusion_matrix"] = compute_confusion_matrix(y_true, y_prob, threshold)
-
-    return results
 
 
 def compute_discrimination_metrics(
@@ -227,7 +223,7 @@ def compute_discrimination_metrics(
                 result["auprc_ci_95"] = [auprc_ci_lower, auprc_ci_upper]
                 result["auprc_ci_fmt"] = f"(95% CI: {auprc_ci_lower:.3f}-{auprc_ci_upper:.3f})"
 
-    return result
+    return cast(DiscriminationMetrics, result)
 
 
 def compute_calibration_metrics(
@@ -264,14 +260,27 @@ def compute_calibration_metrics(
     smoothed_pred = np.array([])
     smoothed_true = np.array([])
     try:
-        from statsmodels.nonparametric.smoothers_lowess import lowess
+        if np.unique(y_prob).size >= 3:
+            from statsmodels.nonparametric.smoothers_lowess import lowess
 
-        order = np.argsort(y_prob)
-        prob_sorted = y_prob[order]
-        y_sorted = y_true[order]
-        lowess_result = lowess(y_sorted, prob_sorted, frac=0.75, it=0, return_sorted=True)
-        smoothed_pred = lowess_result[:, 0]
-        smoothed_true = np.clip(lowess_result[:, 1], 0.0, 1.0)
+            order = np.argsort(y_prob)
+            prob_sorted = y_prob[order]
+            y_sorted = y_true[order]
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message=".*invalid value encountered in divide.*",
+                    category=RuntimeWarning,
+                )
+                lowess_result = lowess(
+                    y_sorted,
+                    prob_sorted,
+                    frac=0.75,
+                    it=0,
+                    return_sorted=True,
+                )
+            smoothed_pred = lowess_result[:, 0]
+            smoothed_true = np.clip(lowess_result[:, 1], 0.0, 1.0)
     except Exception as e:
         logger.warning("LOWESS calibration smoothing failed (%s): %s", type(e).__name__, str(e))
 
@@ -298,14 +307,14 @@ def compute_calibration_metrics(
                 type(e).__name__,
                 str(e),
             )
-            lr_int = LogisticRegression(solver="lbfgs", max_iter=1000)
+            lr_int = LogisticRegression(solver="lbfgs", C=1e12, max_iter=1000)
             lr_int.fit(logit_p.reshape(-1, 1), y_true)
             intercept = float(lr_int.intercept_[0])
 
-        # Calibration SLOPE using sklearn LogisticRegression
-        lr_slope = LogisticRegression(solver="lbfgs", max_iter=1000)
-        lr_slope.fit(logit_p.reshape(-1, 1), y_true)
-        slope = float(lr_slope.coef_[0, 0])
+        # Calibration SLOPE via logistic recalibration model (free intercept + slope)
+        # This avoids regularization shrinkage in sklearn defaults.
+        slope_model = Logit(y_true, np.column_stack([np.ones_like(logit_p), logit_p])).fit(disp=0)
+        slope = float(slope_model.params[1])
     except (ValueError, np.linalg.LinAlgError) as e:
         logger.warning(
             "Calibration slope computation failed: %s. Using default slope=1.0",
@@ -334,29 +343,32 @@ def compute_calibration_metrics(
         eci = float(eci_numer / eci_denom) if eci_denom > 0 else 0.0
         e_max = float(np.max(np.abs(error_true - error_pred)))
 
-    return {
-        "brier_score": float(brier),
-        "brier_scaled": float(brier_scaled),  # Van Calster BSS
-        "calibration_slope": slope,
-        "calibration_intercept": intercept,
-        "oe_ratio": oe_ratio,
-        "eo_ratio": float(eo_ratio),
-        "ici": ici,
-        "eci": eci,  # Van Calster E-statistic
-        "e_max": e_max,
-        "calibration_curve": {
-            "prob_true": prob_true.tolist() if len(prob_true) > 0 else [],
-            "prob_pred": prob_pred.tolist() if len(prob_pred) > 0 else [],
-            "n_bins": n_bins,
+    return cast(
+        CalibrationMetrics,
+        {
+            "brier_score": float(brier),
+            "brier_scaled": float(brier_scaled),  # Van Calster BSS
+            "calibration_slope": slope,
+            "calibration_intercept": intercept,
+            "oe_ratio": oe_ratio,
+            "eo_ratio": float(eo_ratio),
+            "ici": ici,
+            "eci": eci,  # Van Calster E-statistic
+            "e_max": e_max,
+            "calibration_curve": {
+                "prob_true": prob_true.tolist() if len(prob_true) > 0 else [],
+                "prob_pred": prob_pred.tolist() if len(prob_pred) > 0 else [],
+                "n_bins": n_bins,
+            },
+            "calibration_curve_smoothed": {
+                "prob_true": smoothed_true.tolist() if len(smoothed_true) > 0 else [],
+                "prob_pred": smoothed_pred.tolist() if len(smoothed_pred) > 0 else [],
+                "method": "lowess",
+                "frac": 0.75,
+            },
+            "interpretation": _interpret_calibration(slope, brier),
         },
-        "calibration_curve_smoothed": {
-            "prob_true": smoothed_true.tolist() if len(smoothed_true) > 0 else [],
-            "prob_pred": smoothed_pred.tolist() if len(smoothed_pred) > 0 else [],
-            "method": "lowess",
-            "frac": 0.75,
-        },
-        "interpretation": _interpret_calibration(slope, brier),
-    }
+    )
 
 
 def _interpret_calibration(slope: float, brier: float) -> str:
@@ -491,7 +503,7 @@ def compute_classification_at_threshold(
             if ppv_ci_lower is not None:
                 result["ppv_ci_95"] = [ppv_ci_lower, ppv_ci_upper]
 
-    return result
+    return cast(ClassificationMetrics, result)
 
 
 def compute_threshold_analysis(

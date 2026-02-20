@@ -203,8 +203,10 @@ def compute_metric_ci(
     Returns:
         Tuple of (lower, upper) CI bounds.
     """
-    ci_func = clopper_pearson_ci if group_metrics.ci_method == "clopper_pearson" else (
-        lambda s, t, c=0.95: ci_wilson(s, t, alpha=1-c)
+    ci_func = (
+        clopper_pearson_ci
+        if group_metrics.ci_method == "clopper_pearson"
+        else (lambda s, t, c=0.95: ci_wilson(s, t, alpha=1 - c))
     )
 
     # Map metric to numerator/denominator

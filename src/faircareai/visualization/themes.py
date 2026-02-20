@@ -299,19 +299,19 @@ TYPOGRAPHY: dict[str, Any] = {
     "line_height": 1.4,
     # Chart typography - SCIENTIFIC PUBLICATION STANDARD
     "headline_size": 18,  # Main figure title (serif, bold)
-    "deck_size": 14,      # Subtitle/context (sans, normal)
-    "annotation_size": 14, # Data labels on charts
-    "source_size": 14,    # Source attribution (italic, WCAG 2.1 AA minimum)
-    "callout_size": 14,   # Callout annotations
+    "deck_size": 14,  # Subtitle/context (sans, normal)
+    "annotation_size": 14,  # Data labels on charts
+    "source_size": 14,  # Source attribution (italic, WCAG 2.1 AA minimum)
+    "callout_size": 14,  # Callout annotations
     # Axis typography - readable at publication scale
     "axis_title_size": 14,  # X/Y axis labels
-    "tick_size": 14,        # Tick labels
-    "legend_size": 14,      # Legend text
+    "tick_size": 14,  # Tick labels
+    "legend_size": 14,  # Legend text
     # PowerPoint/Export specific (larger for presentations)
-    "ppt_title_size": 28,   # Slide titles
-    "ppt_subtitle_size": 20, # Slide subtitles
-    "ppt_body_size": 16,    # Slide body text
-    "ppt_label_size": 14,   # Chart labels in PPT
+    "ppt_title_size": 28,  # Slide titles
+    "ppt_subtitle_size": 20,  # Slide subtitles
+    "ppt_body_size": 16,  # Slide body text
+    "ppt_label_size": 14,  # Chart labels in PPT
 }
 
 

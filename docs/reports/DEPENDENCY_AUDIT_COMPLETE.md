@@ -57,7 +57,7 @@ export = [
 
 ### 1. pyproject.toml Updates
 
-**File:** [pyproject.toml](pyproject.toml)
+**File:** [pyproject.toml](../../pyproject.toml)
 
 #### Critical Changes:
 - ✅ **Added** `playwright>=1.40.0,<2.0.0` to export dependencies

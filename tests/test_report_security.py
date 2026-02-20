@@ -46,12 +46,12 @@ class TestXSSPrevention:
         assert html.escape(malicious_message) in html_output
         assert html.escape(malicious_details) in html_output
         # The dangerous tags should be escaped
-        assert '<script>' not in html_output
-        assert '</script>' not in html_output
-        assert '<img src=x' not in html_output
+        assert "<script>" not in html_output
+        assert "</script>" not in html_output
+        assert "<img src=x" not in html_output
         # The escaped versions should be present
-        assert '&lt;script&gt;' in html_output
-        assert '&lt;img src=x' in html_output
+        assert "&lt;script&gt;" in html_output
+        assert "&lt;img src=x" in html_output
 
     def test_flag_message_special_characters(self, sample_audit_results):
         """Test that special HTML characters in flags are properly escaped."""
@@ -138,12 +138,12 @@ class TestXSSPrevention:
         html_output = _generate_flags_section(sample_audit_results)
 
         # Verify all malicious content is escaped (tags are escaped, not removed)
-        assert '<script>' not in html_output
-        assert '</script>' not in html_output
-        assert '<a href=' not in html_output
+        assert "<script>" not in html_output
+        assert "</script>" not in html_output
+        assert "<a href=" not in html_output
         # The escaped versions should be present
-        assert '&lt;script&gt;' in html_output
-        assert '&lt;a href=' in html_output
+        assert "&lt;script&gt;" in html_output
+        assert "&lt;a href=" in html_output
         assert html.escape('<script>alert("test")</script>') in html_output
         assert html.escape('<a href="javascript:void(0)">Click</a>') in html_output
 
@@ -170,12 +170,12 @@ class TestExceptionMessageSafety:
         malicious_error = '<script>alert("error")</script>'
         escaped = html.escape(malicious_error)
 
-        assert escaped == '&lt;script&gt;alert(&quot;error&quot;)&lt;/script&gt;'
+        assert escaped == "&lt;script&gt;alert(&quot;error&quot;)&lt;/script&gt;"
         # The key test: script tags are escaped and won't execute
-        assert '<script>' not in escaped
-        assert '</script>' not in escaped
+        assert "<script>" not in escaped
+        assert "</script>" not in escaped
         # alert() is still in the text but can't execute without script tags
-        assert 'alert(&quot;error&quot;)' in escaped
+        assert "alert(&quot;error&quot;)" in escaped
 
 
 class TestHTMLEscapeFunction:
@@ -183,48 +183,48 @@ class TestHTMLEscapeFunction:
 
     def test_escape_basic_html(self):
         """Test basic HTML escaping."""
-        input_str = '<div>Test</div>'
-        expected = '&lt;div&gt;Test&lt;/div&gt;'
+        input_str = "<div>Test</div>"
+        expected = "&lt;div&gt;Test&lt;/div&gt;"
         assert html.escape(input_str) == expected
 
     def test_escape_script_tags(self):
         """Test script tag escaping."""
-        input_str = '<script>alert(1)</script>'
-        expected = '&lt;script&gt;alert(1)&lt;/script&gt;'
+        input_str = "<script>alert(1)</script>"
+        expected = "&lt;script&gt;alert(1)&lt;/script&gt;"
         assert html.escape(input_str) == expected
 
     def test_escape_quotes(self):
         """Test quote escaping."""
         input_str = 'He said "Hello"'
-        expected = 'He said &quot;Hello&quot;'
+        expected = "He said &quot;Hello&quot;"
         assert html.escape(input_str) == expected
 
     def test_escape_ampersand(self):
         """Test ampersand escaping."""
-        input_str = 'X & Y'
-        expected = 'X &amp; Y'
+        input_str = "X & Y"
+        expected = "X &amp; Y"
         assert html.escape(input_str) == expected
 
     def test_escape_less_than_greater_than(self):
         """Test < and > escaping."""
-        input_str = 'if x < 10 and y > 5'
-        expected = 'if x &lt; 10 and y &gt; 5'
+        input_str = "if x < 10 and y > 5"
+        expected = "if x &lt; 10 and y &gt; 5"
         assert html.escape(input_str) == expected
 
     def test_escape_preserves_unicode(self):
         """Test that unicode is preserved during escaping."""
-        input_str = 'Température: 25°C ☀️'
+        input_str = "Température: 25°C ☀️"
         # Unicode should be preserved, only HTML chars escaped
         result = html.escape(input_str)
-        assert '°C' in result
-        assert '☀️' in result
+        assert "°C" in result
+        assert "☀️" in result
 
     def test_escape_empty_string(self):
         """Test escaping empty string."""
-        assert html.escape('') == ''
+        assert html.escape("") == ""
 
     def test_escape_none_converted_to_string(self):
         """Test that None is converted before escaping."""
         # In our code we use str(e) before escaping
         result = html.escape(str(None))
-        assert result == 'None'
+        assert result == "None"

@@ -115,10 +115,14 @@ Issues = "https://github.com/sajor2000/faircare_package/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/faircareai"]
-include = ["src/faircareai/data/**"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/faircareai/data/**"]
+include = [
+    "src/faircareai/**",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 # ==============================================================================
 # Pytest Configuration

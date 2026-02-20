@@ -131,6 +131,13 @@ class GroupMetricsWithError(TypedDict, total=False):
     npv: float
     auroc: float
     auroc_ci_95: list[float | None]
+    mean_predicted_prob: float
+    mean_calibration_error: float
+    tp: int
+    fp: int
+    tn: int
+    fn: int
+    is_reference: bool
 
 
 class FairnessResult(TypedDict):
@@ -168,6 +175,9 @@ class FairnessResult(TypedDict):
 
     ppv_ratio: dict[str, float | None]
     """PPV ratios vs reference (predictive parity)."""
+
+    ppv_diff: dict[str, float]
+    """PPV differences vs reference."""
 
     calibration_diff: dict[str, float]
     """Calibration error differences vs reference."""
@@ -228,6 +238,9 @@ class CalibrationMetrics(TypedDict):
     brier_score: float
     """Brier score (mean squared error of predictions)."""
 
+    brier_scaled: NotRequired[float]
+    """Scaled Brier score (BSS)."""
+
     calibration_slope: float
     """Calibration slope (1.0 = perfect, <1 = overfitting, >1 = underfitting)."""
 
@@ -243,11 +256,17 @@ class CalibrationMetrics(TypedDict):
     ici: float
     """Integrated Calibration Index (mean absolute calibration error)."""
 
+    eci: NotRequired[float]
+    """Expected Calibration Index (scaled squared calibration error)."""
+
     e_max: float
     """Maximum Calibration Error."""
 
     calibration_curve: dict[str, list[float] | int]
     """Calibration curve data with 'prob_true', 'prob_pred', 'n_bins' keys."""
+
+    calibration_curve_smoothed: NotRequired[dict[str, list[float] | str | float]]
+    """Smoothed calibration curve data (e.g., LOWESS)."""
 
     interpretation: str
     """Human-readable interpretation of calibration quality."""
@@ -276,6 +295,24 @@ class ClassificationMetrics(TypedDict):
 
     f1_score: float
     """F1 score (harmonic mean of precision and recall)."""
+
+    accuracy: NotRequired[float]
+    """Overall accuracy."""
+
+    balanced_accuracy: NotRequired[float]
+    """Balanced accuracy."""
+
+    youden_index: NotRequired[float]
+    """Youden index (sensitivity + specificity - 1)."""
+
+    mcc: NotRequired[float]
+    """Matthews correlation coefficient."""
+
+    dor: NotRequired[float | None]
+    """Diagnostic odds ratio."""
+
+    kappa: NotRequired[float]
+    """Cohen's kappa."""
 
     pct_flagged: float
     """Percentage of samples flagged as positive."""
@@ -440,3 +477,6 @@ class DisparityIndexResult(TypedDict):
 
     raw_metrics: FairnessResult
     """Raw fairness metrics used in computation."""
+
+    error: NotRequired[str]
+    """Optional error message when disparity index cannot be fully computed."""

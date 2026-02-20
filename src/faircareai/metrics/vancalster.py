@@ -386,9 +386,7 @@ def _compute_calibration_metrics(
             smoothed_pred = lowess_result[:, 0]
             smoothed_true = np.clip(lowess_result[:, 1], 0.0, 1.0)
         except Exception as e:
-            logger.warning(
-                "LOWESS calibration smoothing failed (%s): %s", type(e).__name__, str(e)
-            )
+            logger.warning("LOWESS calibration smoothing failed (%s): %s", type(e).__name__, str(e))
 
         result["calibration_curve_smoothed"] = {
             "prob_true": smoothed_true.tolist() if len(smoothed_true) > 0 else [],

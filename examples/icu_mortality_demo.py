@@ -21,8 +21,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from faircareai import FairCareAudit, FairnessConfig
 from faircareai.core.config import FairnessMetric, UseCaseType
@@ -85,7 +85,7 @@ def main():
     if suggestions:
         console.print(f"  Detected {len(suggestions)} sensitive attributes")
         audit.accept_suggested_attributes([1, 2, 3])
-        console.print(f"  Configured: race_ethnicity, insurance, language")
+        console.print("  Configured: race_ethnicity, insurance, language")
 
     # Configure
     audit.config = FairnessConfig(

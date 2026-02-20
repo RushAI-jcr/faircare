@@ -75,10 +75,20 @@ def compute_fairness_metrics(
         - calibration_diff: Calibration differences
         - group_metrics: Per-group raw metrics
     """
-    results: dict[str, Any] = {
+    results: FairnessResult = {
         "group_col": group_col,
         "threshold": threshold,
+        "reference": "",
         "group_metrics": {},
+        "demographic_parity_ratio": {},
+        "demographic_parity_diff": {},
+        "tpr_diff": {},
+        "fpr_diff": {},
+        "equalized_odds_diff": {},
+        "ppv_ratio": {},
+        "ppv_diff": {},
+        "calibration_diff": {},
+        "summary": {},
     }
 
     groups = get_unique_groups(df, group_col)
@@ -154,15 +164,6 @@ def compute_fairness_metrics(
         return results
 
     # Compute disparity metrics
-    results["demographic_parity_ratio"] = {}
-    results["demographic_parity_diff"] = {}
-    results["tpr_diff"] = {}
-    results["fpr_diff"] = {}
-    results["equalized_odds_diff"] = {}
-    results["ppv_ratio"] = {}
-    results["ppv_diff"] = {}
-    results["calibration_diff"] = {}
-
     ref_selection = ref_metrics.get("selection_rate", 0)
     ref_tpr = ref_metrics.get("tpr", 0)
     ref_fpr = ref_metrics.get("fpr", 0)
@@ -216,7 +217,7 @@ def compute_fairness_metrics(
     return results
 
 
-def _compute_fairness_summary(metrics: dict) -> dict[str, Any]:
+def _compute_fairness_summary(metrics: dict[str, Any] | FairnessResult) -> dict[str, Any]:
     """Compute summary statistics for fairness metrics.
 
     Args:
@@ -320,7 +321,13 @@ def compute_disparity_index(
     metrics = compute_fairness_metrics(df, y_prob_col, y_true_col, group_col, threshold, reference)
 
     if "error" in metrics:
-        return {"error": metrics["error"]}
+        return {
+            "disparity_index": 0.0,
+            "components": {},
+            "interpretation": _interpret_disparity_index(0.0),
+            "raw_metrics": metrics,
+            "error": metrics["error"],
+        }
 
     # Component scores (0-1 scale, higher = more disparity)
     components = {}

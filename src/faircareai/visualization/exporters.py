@@ -210,7 +210,9 @@ def export_plotly_figure(
     except (ValueError, TypeError) as e:
         raise FigureExportError(format=format, reason=f"Invalid figure data: {e}", path=path) from e
     except ImportError as e:
-        raise FigureExportError(format=format, reason=f"Missing export dependency: {e}", path=path) from e
+        raise FigureExportError(
+            format=format, reason=f"Missing export dependency: {e}", path=path
+        ) from e
     except Exception as e:
         # Safety net for unknown errors
         raise FigureExportError(format=format, reason=f"Unexpected error: {e}", path=path) from e
@@ -311,7 +313,9 @@ def export_altair_chart(
     except (ValueError, TypeError) as e:
         raise FigureExportError(format=format, reason=f"Invalid chart data: {e}", path=path) from e
     except ImportError as e:
-        raise FigureExportError(format=format, reason=f"Missing export dependency: {e}", path=path) from e
+        raise FigureExportError(
+            format=format, reason=f"Missing export dependency: {e}", path=path
+        ) from e
     except Exception as e:
         # Safety net for unknown errors
         raise FigureExportError(format=format, reason=f"Unexpected error: {e}", path=path) from e
