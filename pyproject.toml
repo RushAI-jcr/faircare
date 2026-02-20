@@ -47,7 +47,7 @@ classifiers = [
 dependencies = [
     # Data processing - pin major versions for stability
     "polars>=0.20.0,<1.0.0",
-    "pyarrow>=14.0.0,<18.0.0",
+    "pyarrow>=14.0.0,<24.0.0",
     "numpy>=1.26.0,<2.0.0",  # Improved Apple Silicon support, avoid numpy 2.0
 
     # Visualization - Interactive
