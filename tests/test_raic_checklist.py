@@ -41,3 +41,7 @@ def test_raic_checklist_full_length(raic_results: AuditResults, tmp_path: Path) 
 
     statuses = {item["status"] for item in criteria}
     assert "MET" in statuses
+
+    assert payload["source_url"].startswith("https://chai.org/wp-content/uploads/")
+    assert payload["documentation_url"] == payload["source_url"]
+    assert payload["document_version"] == "v0.3"

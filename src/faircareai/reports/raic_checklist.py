@@ -51,7 +51,9 @@ def _auto_evaluable_items(results: AuditResults) -> dict[str, dict[str, Any]]:
             "ls_id": "LS2.ME12",
             "summary": "Confidence intervals reported for model performance.",
             "status": _format_status(_has_confidence_intervals(results), else_status="PARTIAL"),
-            "evidence": "AUROC CI available" if _has_confidence_intervals(results) else "CI not computed",
+            "evidence": "AUROC CI available"
+            if _has_confidence_intervals(results)
+            else "CI not computed",
         },
         "AC1.CR85": {
             "ls_id": "LS2.ME14",
@@ -98,8 +100,7 @@ def _auto_evaluable_items(results: AuditResults) -> dict[str, dict[str, Any]]:
             "summary": "Primary fairness metric selected and justified.",
             "status": _format_status(
                 bool(
-                    results.config.primary_fairness_metric
-                    and results.config.fairness_justification
+                    results.config.primary_fairness_metric and results.config.fairness_justification
                 )
             ),
             "evidence": results.config.fairness_justification or "Not provided",
@@ -109,7 +110,9 @@ def _auto_evaluable_items(results: AuditResults) -> dict[str, dict[str, Any]]:
             "summary": "Performance and parity assessed across sensitive attributes.",
             "status": _format_status(_has_subgroup_analysis(results)),
             "evidence": (
-                "Subgroup fairness metrics available" if _has_subgroup_analysis(results) else "Missing"
+                "Subgroup fairness metrics available"
+                if _has_subgroup_analysis(results)
+                else "Missing"
             ),
         },
     }
@@ -127,6 +130,26 @@ def _load_raic_criteria() -> list[dict[str, Any]]:
     return criteria
 
 
+def _load_raic_metadata() -> dict[str, str]:
+    data_path = resources.files("faircareai.data").joinpath("raic/checkpoint_1.json")
+    payload = json.loads(data_path.read_text(encoding="utf-8"))
+
+    source_url = payload.get(
+        "source_url",
+        "https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf",
+    )
+    documentation_url = payload.get("documentation_url", source_url)
+    document_version = payload.get("version", "unknown")
+    last_revised = payload.get("last_revised", "")
+
+    return {
+        "source_url": source_url,
+        "documentation_url": documentation_url,
+        "document_version": document_version,
+        "last_revised": last_revised,
+    }
+
+
 def generate_raic_checkpoint_1_checklist(results: AuditResults, path: str | Path) -> Path:
     """Generate a RAIC Checkpoint 1 checklist JSON export."""
     path = Path(path)
@@ -134,6 +157,7 @@ def generate_raic_checkpoint_1_checklist(results: AuditResults, path: str | Path
 
     auto_items = _auto_evaluable_items(results)
     catalog = _load_raic_criteria()
+    metadata = _load_raic_metadata()
     criteria: list[dict[str, Any]] = []
     for item in catalog:
         criteria_id = item.get("id")
@@ -158,10 +182,10 @@ def generate_raic_checkpoint_1_checklist(results: AuditResults, path: str | Path
 
     checklist = {
         "raic_checkpoint": "Checkpoint 1",
-        "source_url": "https://www.chai.org/workgroup/responsible-ai/responsible-ai-checklists-raic",
-        "documentation_url": "https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf",
-        "document_version": "v0.3",
-        "last_revised": "2024-06-26",
+        "source_url": metadata["source_url"],
+        "documentation_url": metadata["documentation_url"],
+        "document_version": metadata["document_version"],
+        "last_revised": metadata["last_revised"],
         "generated_at": now,
         "audit_id": results.audit_id,
         "model_name": results.config.model_name,
