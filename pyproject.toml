@@ -108,10 +108,10 @@ all = [
 faircareai = "faircareai.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/sajor2000/faircare_package"
-Documentation = "https://github.com/sajor2000/faircare_package#readme"
-Repository = "https://github.com/sajor2000/faircare_package"
-Issues = "https://github.com/sajor2000/faircare_package/issues"
+Homepage = "https://github.com/RushAI-jcr/faircare"
+Documentation = "https://github.com/RushAI-jcr/faircare#readme"
+Repository = "https://github.com/RushAI-jcr/faircare"
+Issues = "https://github.com/RushAI-jcr/faircare/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/faircareai"]

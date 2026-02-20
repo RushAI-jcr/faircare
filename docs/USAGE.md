@@ -27,9 +27,10 @@ pip install "faircareai[compliance]"
 ### Development Installation
 
 ```bash
-git clone https://github.com/sajor2000/faircare_package.git
-cd faircareai
+git clone https://github.com/RushAI-jcr/faircare.git
+cd faircare
 pip install -e ".[dev]"
+pre-commit install
 ```
 
 ### Verify Installation

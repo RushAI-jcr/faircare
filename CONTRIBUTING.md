@@ -25,8 +25,8 @@ Thank you for your interest in contributing to FairCareAI! This document provide
 
 ```bash
 # Clone the repository
-git clone https://github.com/sajor2000/faircare_package.git
-cd faircareai
+git clone https://github.com/RushAI-jcr/faircare.git
+cd faircare
 
 # Create virtual environment
 python -m venv .venv
@@ -53,6 +53,9 @@ uv pip install -e ".[dev,export]"
 ### Verify Setup
 
 ```bash
+# Install git hooks
+pre-commit install
+
 # Run tests
 pytest tests/ -v
 
@@ -64,6 +67,9 @@ ruff check src/
 
 # Format check
 ruff format --check src/
+
+# Full local gate (same style checks as CI)
+pre-commit run --all-files
 ```
 
 ---
@@ -71,7 +77,7 @@ ruff format --check src/
 ## Project Structure
 
 ```
-faircareai/
+faircare/
 ├── src/faircareai/      # Main package
 │   ├── core/            # Orchestration, config, results
 │   ├── metrics/         # Performance and fairness metrics
@@ -286,6 +292,9 @@ mypy src/faircareai
 
 # Tests
 pytest tests/ -v
+
+# Run local pre-commit gate
+pre-commit run --all-files
 ```
 
 ### 4. Commit
@@ -314,6 +323,7 @@ Then create a Pull Request on GitHub with:
 - Description of what and why
 - Link to related issues
 - Screenshots for UI changes
+- Completed checklist in `.github/pull_request_template.md`
 
 ### 6. Review Process
 
@@ -443,13 +453,15 @@ Maintainers handle releases:
 3. Create git tag
 4. GitHub Actions builds and publishes to PyPI
 
+Use `docs/RELEASE_CHECKLIST.md` for the release gate, including quality checks and artifact verification.
+
 ---
 
 ## Getting Help
 
-- **Questions**: Open a GitHub Discussion
+- **Questions**: Open a [GitHub Discussion](https://github.com/RushAI-jcr/faircare/discussions)
 - **Bugs**: Open a GitHub Issue with reproduction steps
-- **Security**: Email security@example.com (do not open public issue)
+- **Security**: Use [GitHub Security Advisories](https://github.com/RushAI-jcr/faircare/security/advisories/new) (do not open public issue)
 
 ---
 

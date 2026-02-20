@@ -164,7 +164,7 @@ P(Y = 1 | Ŷ = 1, A = a) = P(Y = 1 | Ŷ = 1, A = b)
 **Definition:** Equal calibration across groups (predicted probabilities match observed frequencies).
 
 ```
-P(Y = 1 | Ŷ = p, A = a) = p = P(Y = 1 | Ŷ = p, A = b)
+P(Y = 1 | R_hat = p, A = a) = p = P(Y = 1 | R_hat = p, A = b)
 ```
 
 **Best for:** Shared decision-making where probabilities are communicated.

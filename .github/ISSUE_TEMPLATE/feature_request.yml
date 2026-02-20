@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a new capability for FairCareAI
+title: "[Feature]: "
+labels:
+  - enhancement
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the user need, proposed behavior, and impact on fairness/governance workflows.
+  - type: input
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve?
+      placeholder: Need model-card export in a compliance pipeline with deterministic metadata.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe desired API/CLI/UI behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Clear testable criteria for completion.
+      placeholder: |
+        - CLI accepts new flag ...
+        - Export validates against schema ...
+        - Tests added for ...

@@ -1,6 +1,6 @@
 # FairCareAI
 
-[![CI](https://github.com/sajor2000/faircare_package/actions/workflows/ci.yml/badge.svg)](https://github.com/sajor2000/faircare_package/actions/workflows/ci.yml)
+[![CI](https://github.com/RushAI-jcr/faircare/actions/workflows/ci.yml/badge.svg)](https://github.com/RushAI-jcr/faircare/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/faircareai.svg)](https://pypi.org/project/faircareai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -88,9 +88,10 @@ Installs `xmlschema` to validate CHAI model card XML against the v0.1 XSD.
 ### Development Installation
 
 ```bash
-git clone https://github.com/sajor2000/faircare_package.git
-cd faircareai
+git clone https://github.com/RushAI-jcr/faircare.git
+cd faircare
 pip install -e ".[dev]"
+pre-commit install
 ```
 
 ### Platform Support
@@ -569,15 +570,15 @@ All visualizations follow publication-ready standards:
 
 ## Fairness Metrics
 
-FairCareAI supports multiple fairness definitions, acknowledging the **impossibility theorem** (Chouldechova 2017, Kleinberg et al. 2017) - no single metric is universally correct.
+FairCareAI supports multiple fairness definitions and follows the **impossibility theorem** results (Chouldechova 2017, Kleinberg et al. 2017): when base rates differ by group, key fairness criteria cannot generally all be satisfied simultaneously (except special cases such as perfect prediction).
 
-| Metric | Definition | Best For | Clinical Interpretation |
-|--------|------------|----------|------------------------|
+| Metric | Definition | Common Use Case | Clinical Interpretation |
+|--------|------------|-----------------|------------------------|
 | **Demographic Parity** | Equal selection rates across groups:<br>P(Ŷ=1\|A=a) = P(Ŷ=1\|A=b) | Resource allocation | Equal proportion of each group receives intervention |
-| **Equalized Odds** | Equal TPR and FPR across groups:<br>P(Ŷ=1\|Y=y,A=a) = P(Ŷ=1\|Y=y,A=b) | Intervention triggers | Equal error rates - no group systematically favored/disadvantaged |
-| **Equal Opportunity** | Equal TPR across groups only:<br>P(Ŷ=1\|Y=1,A=a) = P(Ŷ=1\|Y=1,A=b) | Screening programs | Equal detection of true positives (disease cases) |
-| **Predictive Parity** | Equal PPV across groups:<br>P(Y=1\|Ŷ=1,A=a) = P(Y=1\|Ŷ=1,A=b) | Risk communication | When flagged positive, same likelihood across groups |
-| **Calibration** | Equal calibration curves across groups:<br>E[Y\|Ŷ=p,A=a] = p for all groups | Shared decision-making | Risk predictions are accurate within each group |
+| **Equalized Odds** | Equal true/false positive rates across groups:<br>P(Ŷ=1\|Y=y,A=a) = P(Ŷ=1\|Y=y,A=b), for y∈{0,1} | Intervention triggers | Similar missed-case and false-alarm rates across groups |
+| **Equal Opportunity** | Equal true positive rates across groups:<br>P(Ŷ=1\|Y=1,A=a) = P(Ŷ=1\|Y=1,A=b) | Screening programs | Similar detection of true cases across groups |
+| **Predictive Parity** | Equal positive predictive value across groups:<br>P(Y=1\|Ŷ=1,A=a) = P(Y=1\|Ŷ=1,A=b) | Risk communication | A positive flag has similar meaning across groups |
+| **Calibration** | Group-wise risk calibration:<br>E[Y\|R_hat=p,A=a] = p (equivalently, P(Y=1\|R_hat=p,A=a)=p) | Shared decision-making | Predicted risk aligns with observed risk within each group |
 
 ### Metric Selection Guidance
 
@@ -1040,8 +1041,8 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 
 ```bash
 # Clone repository
-git clone https://github.com/sajor2000/faircare_package.git
-cd faircareai
+git clone https://github.com/RushAI-jcr/faircare.git
+cd faircare
 
 # Install dev dependencies
 pip install -e ".[dev]"
@@ -1074,9 +1075,9 @@ If you use FairCareAI in your research or clinical implementation, please cite:
 @software{faircareai,
   title = {FairCareAI: Healthcare AI Fairness Auditing},
   author = {FairCareAI Contributors},
-  year = {2024},
-  url = {https://github.com/sajor2000/faircare_package},
-  version = {0.2.1},
+  year = {2026},
+  url = {https://github.com/RushAI-jcr/faircare},
+  version = {0.2.0},
   note = {Python package for auditing ML fairness in healthcare}
 }
 ```
@@ -1114,11 +1115,12 @@ If you use FairCareAI in your research or clinical implementation, please cite:
   - [USAGE.md](docs/USAGE.md) - Quickstart and end-to-end usage
   - [METHODOLOGY.md](docs/METHODOLOGY.md) - Scientific foundation and fairness theory
   - [PDF_SETUP_GUIDE.md](docs/PDF_SETUP_GUIDE.md) - PDF export setup
+  - [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) - Maintainer release gate
   - [ARCHITECTURE.md](ARCHITECTURE.md) - System design and data flow
   - [CONTRIBUTING.md](CONTRIBUTING.md) - Development guidelines
   - [Reports & audits](docs/reports/) - Internal reviews and verification artifacts
-- **Issues**: [GitHub Issues](https://github.com/sajor2000/faircare_package/issues)
-- **Community Q&A**: Use [GitHub Issues](https://github.com/sajor2000/faircare_package/issues) for questions and feature requests
+- **Issues**: [GitHub Issues](https://github.com/RushAI-jcr/faircare/issues)
+- **Community Q&A**: Use [GitHub Discussions](https://github.com/RushAI-jcr/faircare/discussions) for questions and feature requests
 - **Code of Conduct**: See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **Security**: See [SECURITY.md](SECURITY.md)
 
