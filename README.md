@@ -420,7 +420,9 @@ results.to_png("figures_ds.zip", persona="data_scientist", include_optional=True
 FairCareAI aligns governance artifacts with the CHAI Applied Model Card template and RAIC Checkpoint 1 checklist:
 - [CHAI Applied Model Card documentation](https://mc.chai.org/v0.1/documentation.pdf)
 - [CHAI Applied Model Card schema](https://github.com/coalition-for-health-ai/mc-schema)
-- [CHAI RAIC Checkpoint 1 checklist](https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf)
+- [CHAI RAIC Checkpoint 1 checklist PDF](https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf)
+
+`to_raic_checkpoint_1()` exports the full checklist with criterion IDs, auto-evaluable evidence where available, and reviewer placeholders for manual governance sign-off.
 
 ---
 
@@ -839,7 +841,7 @@ All governance outputs use plain language principles:
 
 ## Governance Compliance (CHAI RAIC)
 
-FairCareAI is aligned with the [Coalition for Health AI (CHAI) RAIC Framework](https://www.coalitionforhealthai.org/) Checkpoint 1: Fairness Assessment.
+FairCareAI is aligned with the [Coalition for Health AI (CHAI) RAIC Framework](https://www.chai.org/workgroup/responsible-ai/responsible-ai-checklists-raic) Checkpoint 1: Fairness Assessment.
 
 ### CHAI Assurance Criteria Mapping
 
@@ -1096,7 +1098,7 @@ If you use FairCareAI in your research or clinical implementation, please cite:
 
 ### Governance Frameworks
 
-- **Coalition for Health AI (CHAI)**. (2024). RAIC Framework: Responsible AI in Healthcare. Retrieved from https://www.coalitionforhealthai.org/
+- **Coalition for Health AI (CHAI)**. (2025). Responsible AI Checkpoint 1 Checklist (official PDF). Retrieved from https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf
 - **FDA.** (2021). Artificial Intelligence/Machine Learning (AI/ML)-Based Software as a Medical Device (SaMD) Action Plan.
 
 ### Healthcare Disparities
@@ -1116,7 +1118,7 @@ If you use FairCareAI in your research or clinical implementation, please cite:
   - [CONTRIBUTING.md](CONTRIBUTING.md) - Development guidelines
   - [Reports & audits](docs/reports/) - Internal reviews and verification artifacts
 - **Issues**: [GitHub Issues](https://github.com/sajor2000/faircare_package/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sajor2000/faircare_package/discussions)
+- **Community Q&A**: Use [GitHub Issues](https://github.com/sajor2000/faircare_package/issues) for questions and feature requests
 - **Code of Conduct**: See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **Security**: See [SECURITY.md](SECURITY.md)
 

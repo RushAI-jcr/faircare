@@ -662,10 +662,15 @@ to_raic_checkpoint_1(path: str | Path) -> Path
 
 Export a RAIC Checkpoint 1 evidence checklist (JSON).
 
+The export includes:
+- Full criterion list with ID-aligned statuses/evidence
+- `source_url`, `documentation_url`, `document_version`, and `last_revised`
+- Reviewer placeholder fields for governance sign-off
+
 Reference links:
 - [CHAI Applied Model Card documentation](https://mc.chai.org/v0.1/documentation.pdf)
 - [CHAI Applied Model Card schema](https://github.com/coalition-for-health-ai/mc-schema)
-- [CHAI RAIC Checkpoint 1 checklist](https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf)
+- [CHAI RAIC Checkpoint 1 checklist PDF](https://chai.org/wp-content/uploads/2025/02/Responsible-AI-Checkpoint-1-CHAI-Responsible-AI-Checklist.pdf)
 
 ##### to_png()
 
